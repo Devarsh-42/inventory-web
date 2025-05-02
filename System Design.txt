@@ -1,0 +1,101 @@
+GPT Link: https://chatgpt.com/share/680d081d-aea0-8011-aa74-16f74002a9f3
+
+App Flow Diagram: https://app.eraser.io/workspace/9F7V4jGn1khhHjL4aOUo?origin=share
+
+UML Diag Link: https://editor.plantuml.com/uml/ZP9FIyD04CNl-od6dlJGB-11MYnAeSK_0I-bXsaoj8lRtJ0xgHJnkvlgOZgh8HxpvZVBlFSoYO8ipTwP2zdHdc3Z6jeo7asDvIjk2KPthX4XXcbTZ-3T0AmMOMiz52KJ-JMCnpUmcZRjkXTRejZWuSNIsp9KvDOdVePnjmd8bTwP-mDv2NpCy0UkYADcawR1MtJaAsI5Tgg6YrQESCzOxpJ_J7LWoTzUelL27dr92bU3ivKFqoLsUZ5Q2MmffiXE-Vp8npKOEFEV3PBPJiqFoYR9GAVgQmhYWosxInxdaAJlN9uMLWXcABZ1I7gsBBhlzitUcbCscKlpLyLv-OhFQrRjArArFC3-RbWrhrXTh-PxAZ2PxqIheBLVnVKMeAqCBwZZ_x-Lnp2yqNUP-b_W6YBvweii1AM9KqSiyVBAJ5gzsRjF
+
+
+== Background
+
+The application is designed to streamline operations across Sales, Production, and Management departments within a manufacturing or retail business. 
+Currently, various teams manage inventory, orders, and maintenance through disjointed processes and manual tracking. 
+A centralized mobile platform is needed to integrate these activities while offering real-time updates, reporting, and alerts.
+
+The application must support multiple user roles (Admin, Sales, Production) and provide real-time interaction with a backend server (for vision system reports and SMS alerts) while storing critical information locally (using SQLite and local storage) to allow offline operations.
+
+
+
+=== Flow Diagram Code:
+
+@startuml
+!theme bluegray
+package "Flutter App" {
+  [Login Screen] --> [Authentication ViewModel]
+  [Dashboard Screen] --> [Inventory ViewModel]
+  [Orders Screen] --> [Orders ViewModel]
+  [Calendar Screen] --> [Calendar ViewModel]
+  [Sales Graph Screen] --> [Reports ViewModel]
+  [Maintenance Screen] --> [Maintenance ViewModel]
+}
+
+package "Repositories" {
+  [AuthRepository] 
+  [InventoryRepository] 
+  [OrdersRepository]
+  [MaintenanceRepository]
+  [ReportsRepository]
+}
+
+package "Services" {
+  [API Service]
+  [SQLite Database Service]
+  [SMS Service]
+}
+
+[Authentication ViewModel] --> [AuthRepository]
+[Inventory ViewModel] --> [InventoryRepository]
+[Orders ViewModel] --> [OrdersRepository]
+[Calendar ViewModel] --> [OrdersRepository]
+[Reports ViewModel] --> [ReportsRepository]
+[Maintenance ViewModel] --> [MaintenanceRepository]
+
+[AuthRepository] --> [API Service]
+[InventoryRepository] --> [SQLite Database Service]
+[OrdersRepository] --> [SQLite Database Service]
+[MaintenanceRepository] --> [SQLite Database Service]
+[ReportsRepository] --> [SQLite Database Service]
+
+[OrdersRepository] --> [SMS Service] : sendOrderStatusAlerts()
+@enduml
+
+
+---------------------------------------------------------------------------------------------
+
+File Structure:
+
+lib/
+├── core/
+│   ├── constants/           # App-wide constants (e.g., colors, strings)
+│   ├── utils/               # Helper functions (e.g., network checker, formatters)
+│   ├── services/            # SupabaseService, HiveService, NotificationService
+│   └── storage/             # LocalStorage logic using Hive
+│
+├── data/
+│   ├── models/              # Raw models from Supabase or Hive (e.g., OrderModel)
+│   └── repositories/        # Concrete repositories using Supabase/Hive
+│
+├── domain/
+│   ├── entities/            # Clean models (e.g., Order, User, Inventory)
+│   ├── usecases/            # Business logic (e.g., FetchOrders, LoginUser)
+│   └── repositories/        # Abstract interfaces
+│
+├── presentation/
+│   ├── common/              # Shared widgets (buttons, loaders, alerts)
+│   ├── viewmodels/          # Provider-based classes for each feature
+│   ├── routes/              # Route definitions and navigation helpers
+│   ├── auth/                # Login, SignUp, Splash UI
+│   ├── admin/               # Admin Screens
+│   │   ├── dashboard.dart
+│   │   ├── inventory.dart
+│   │   └── reports.dart
+│   ├── sales/               # Sales Screens
+│   │   ├── dashboard.dart
+│   │   ├── orders.dart
+│   │   └── calendar.dart
+│   └── production/          # Production Screens
+│       ├── dashboard.dart
+│       ├── maintenance.dart
+│       └── batch_entry.dart
+│
+├── app.dart                # App widget (MaterialApp)
+└── main.dart               # Entry point: handles Hive/Supabase init and launches app

@@ -1,0 +1,2 @@
+D:/VolcanVision/visionapp/android/app/.cxx/Debug/6l130644/x86/CMakeFiles/edit_cache.dir
+D:/VolcanVision/visionapp/android/app/.cxx/Debug/6l130644/x86/CMakeFiles/rebuild_cache.dir

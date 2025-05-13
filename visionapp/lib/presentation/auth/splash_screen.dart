@@ -1,6 +1,8 @@
 import 'package:animate_do/animate_do.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:visionapp/main.dart';
 import 'package:visionapp/presentation/auth/login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -35,7 +37,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     // Fade animation for the text
     _fadeController = AnimationController(
-      duration: const Duration(milliseconds: 1000),
+      duration: const Duration(milliseconds: 3000),
       vsync: this,
     );
     _fadeAnimation = Tween<double>(
@@ -45,7 +47,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     // Pulse animation for the vision icon
     _pulseController = AnimationController(
-      duration: const Duration(milliseconds: 2000),
+      duration: const Duration(milliseconds: 4000),
       vsync: this,
     )..repeat(reverse: true);
 
@@ -53,13 +55,29 @@ class _SplashScreenState extends State<SplashScreen>
     _startAnimations();
   }
 
+  void _redirect() async{
+    await Future.delayed(const Duration(seconds: 1));
+    final Session = supabase.auth.currentSession;
+    if (Session != null) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+      );
+    } else {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+      );
+    }
+  }
+
   void _startAnimations() {
-    Future.delayed(const Duration(milliseconds: 500)).then((_) {
+    Future.delayed(const Duration(milliseconds: 1000)).then((_) {
       _scaleController.forward();
       _fadeController.forward();
 
       // Navigate to HomePage after 3 seconds
-      Future.delayed(const Duration(seconds: 3)).then((_) {
+      Future.delayed(const Duration(seconds: 4)).then((_) {
         Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => const LoginScreen()),

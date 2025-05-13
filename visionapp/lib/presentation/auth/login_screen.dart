@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:visionapp/presentation/management/dashboard.dart';
+import 'package:visionapp/presentation/routes/app_routes.dart'; 
 import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -21,14 +24,45 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _login() {
-    if (_formKey.currentState!.validate()) {
-      // Handle login logic here
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Processing Login...')),
-      );
-    }
+  Future<void> _login() async {
+    Navigator.push(context, MaterialPageRoute(builder: (context) => const ManagementDashboardScreen()));
   }
+
+
+  // Future<void> _login() async {
+  //   if (_formKey.currentState!.validate()) {
+  //     final email = _companyIdController.text.trim();
+  //     final password = _passwordController.text.trim();
+
+  //     try {
+  //       final response = await Supabase.instance.client.auth.signInWithPassword(
+  //         email: email,
+  //         password: password,
+  //       );
+
+  //       if (response.user != null) {
+  //         Navigator.pushReplacementNamed(context, '/managementHome');
+  //         ScaffoldMessenger.of(context).showSnackBar(
+  //           const SnackBar(content: Text('Login successful!')),
+  //         );
+  //         // Navigate based on interface
+  //         if (_selectedInterface == 'Management') {
+  //           Navigator.pushReplacementNamed(context, '/managementHome');
+  //         } else {
+  //           Navigator.pushReplacementNamed(context, '/productionHome');
+  //         }
+  //       }
+  //     } on AuthException catch (e) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         SnackBar(content: Text(e.message)),
+  //       );
+  //     } catch (e) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         const SnackBar(content: Text('Unexpected error occurred')),
+  //       );
+  //     }
+  //   }
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +78,6 @@ class _LoginScreenState extends State<LoginScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 70),
-                // Logo
                 Center(
                   child: Image.asset(
                     'assets/images/volcan_vision_logo.png',
@@ -52,7 +85,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 30),
-                // Title
                 const Text(
                   'Production',
                   style: TextStyle(
@@ -72,17 +104,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
-                // Company ID
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Company ID',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.black54,
-                      ),
-                    ),
+                    const Text('Company ID', style: TextStyle(fontSize: 14, color: Colors.black54)),
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: _companyIdController,
@@ -100,32 +125,17 @@ class _LoginScreenState extends State<LoginScreen> {
                           borderRadius: BorderRadius.circular(8),
                           borderSide: const BorderSide(color: Colors.deepPurple),
                         ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 16,
-                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                       ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your company ID';
-                        }
-                        return null;
-                      },
+                      validator: (value) => value == null || value.isEmpty ? 'Please enter your company ID' : null,
                     ),
                   ],
                 ),
                 const SizedBox(height: 20),
-                // Password
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Password',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.black54,
-                      ),
-                    ),
+                    const Text('Password', style: TextStyle(fontSize: 14, color: Colors.black54)),
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: _passwordController,
@@ -144,104 +154,45 @@ class _LoginScreenState extends State<LoginScreen> {
                           borderRadius: BorderRadius.circular(8),
                           borderSide: const BorderSide(color: Colors.deepPurple),
                         ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 16,
-                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                       ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your password';
-                        }
-                        return null;
-                      },
+                      validator: (value) => value == null || value.isEmpty ? 'Please enter your password' : null,
                     ),
                   ],
                 ),
                 const SizedBox(height: 24),
-                // Interface Selection
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Select Interface',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.black54,
-                      ),
-                    ),
+                    const Text('Select Interface', style: TextStyle(fontSize: 14, color: Colors.black54)),
                     const SizedBox(height: 8),
                     Row(
                       children: [
                         Expanded(
                           child: GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                _selectedInterface = 'Management';
-                              });
-                            },
+                            onTap: () => setState(() => _selectedInterface = 'Management'),
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               decoration: BoxDecoration(
-                                color: _selectedInterface == 'Management'
-                                    ? Colors.deepPurple
-                                    : Colors.white,
-                                borderRadius: const BorderRadius.only(
-                                  topLeft: Radius.circular(8),
-                                  bottomLeft: Radius.circular(8),
-                                ),
-                                border: Border.all(
-                                  color: _selectedInterface == 'Management'
-                                      ? Colors.deepPurple
-                                      : Colors.grey.shade300,
-                                ),
+                                color: _selectedInterface == 'Management' ? Colors.deepPurple : Colors.white,
+                                borderRadius: const BorderRadius.only(topLeft: Radius.circular(8), bottomLeft: Radius.circular(8)),
+                                border: Border.all(color: _selectedInterface == 'Management' ? Colors.deepPurple : Colors.grey.shade300),
                               ),
-                              child: Text(
-                                'Management',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: _selectedInterface == 'Management'
-                                      ? Colors.white
-                                      : Colors.black87,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
+                              child: Text('Management', textAlign: TextAlign.center, style: TextStyle(color: _selectedInterface == 'Management' ? Colors.white : Colors.black87, fontWeight: FontWeight.w500)),
                             ),
                           ),
                         ),
                         Expanded(
                           child: GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                _selectedInterface = 'Production';
-                              });
-                            },
+                            onTap: () => setState(() => _selectedInterface = 'Production'),
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               decoration: BoxDecoration(
-                                color: _selectedInterface == 'Production'
-                                    ? Colors.deepPurple
-                                    : Colors.white,
-                                borderRadius: const BorderRadius.only(
-                                  topRight: Radius.circular(8),
-                                  bottomRight: Radius.circular(8),
-                                ),
-                                border: Border.all(
-                                  color: _selectedInterface == 'Production'
-                                      ? Colors.deepPurple
-                                      : Colors.grey.shade300,
-                                ),
+                                color: _selectedInterface == 'Production' ? Colors.deepPurple : Colors.white,
+                                borderRadius: const BorderRadius.only(topRight: Radius.circular(8), bottomRight: Radius.circular(8)),
+                                border: Border.all(color: _selectedInterface == 'Production' ? Colors.deepPurple : Colors.grey.shade300),
                               ),
-                              child: Text(
-                                'Production',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: _selectedInterface == 'Production'
-                                      ? Colors.white
-                                      : Colors.black87,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
+                              child: Text('Production', textAlign: TextAlign.center, style: TextStyle(color: _selectedInterface == 'Production' ? Colors.white : Colors.black87, fontWeight: FontWeight.w500)),
                             ),
                           ),
                         ),
@@ -250,50 +201,23 @@ class _LoginScreenState extends State<LoginScreen> {
                   ],
                 ),
                 const SizedBox(height: 32),
-                // Continue Button
                 ElevatedButton(
                   onPressed: _login,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.deepPurple,
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
-                  child: const Text(
-                    'Continue',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
+                  child: const Text('Continue', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
                 ),
                 const SizedBox(height: 16),
-                // Sign Up Link
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text(
-                      "Don't have an account? ",
-                      style: TextStyle(color: Colors.black54),
-                    ),
+                    const Text("Don't have an account? ", style: TextStyle(color: Colors.black54)),
                     GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const SignupScreen(),
-                          ),
-                        );
-                      },
-                      child: const Text(
-                        'Sign Up',
-                        style: TextStyle(
-                          color: Colors.deepPurple,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SignupScreen())),
+                      child: const Text('Sign Up', style: TextStyle(color: Colors.deepPurple, fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),

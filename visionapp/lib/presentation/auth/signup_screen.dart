@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'login_screen.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -27,12 +28,41 @@ class _SignupScreenState extends State<SignupScreen> {
     super.dispose();
   }
 
-  void _signup() {
+  Future<void> _signup() async {
     if (_formKey.currentState!.validate()) {
-      // Handle signup logic here
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Processing Sign Up...')),
-      );
+      final email = _emailController.text.trim();
+      final password = _passwordController.text.trim();
+      final name = _companyNameController.text.trim();
+
+      try {
+        final response = await Supabase.instance.client.auth.signUp(
+          email: email,
+          password: password,
+          data: {'full_name': name, 'interface': _selectedInterface},
+        );
+
+        if (response.user != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Signup successful! Please check your email for verification.',
+              ),
+            ),
+          );
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const LoginScreen()),
+          );
+        }
+      } on AuthException catch (e) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unexpected error occurred')),
+        );
+      }
     }
   }
 
@@ -104,10 +134,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   children: [
                     const Text(
                       'Company Name',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.black54,
-                      ),
+                      style: TextStyle(fontSize: 14, color: Colors.black54),
                     ),
                     const SizedBox(height: 8),
                     TextFormField(
@@ -124,7 +151,9 @@ class _SignupScreenState extends State<SignupScreen> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Colors.deepPurple),
+                          borderSide: const BorderSide(
+                            color: Colors.deepPurple,
+                          ),
                         ),
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
@@ -147,10 +176,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   children: [
                     const Text(
                       'Company ID',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.black54,
-                      ),
+                      style: TextStyle(fontSize: 14, color: Colors.black54),
                     ),
                     const SizedBox(height: 8),
                     TextFormField(
@@ -167,7 +193,9 @@ class _SignupScreenState extends State<SignupScreen> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Colors.deepPurple),
+                          borderSide: const BorderSide(
+                            color: Colors.deepPurple,
+                          ),
                         ),
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
@@ -190,10 +218,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   children: [
                     const Text(
                       'Email Address',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.black54,
-                      ),
+                      style: TextStyle(fontSize: 14, color: Colors.black54),
                     ),
                     const SizedBox(height: 8),
                     TextFormField(
@@ -211,19 +236,23 @@ class _SignupScreenState extends State<SignupScreen> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Colors.deepPurple),
+                          borderSide: const BorderSide(
+                            color: Colors.deepPurple,
+                          ),
                         ),
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
                           vertical: 16,
                         ),
                       ),
-                      validator: (value) {
+                      validator: (String? value) {
                         if (value == null || value.isEmpty) {
                           return 'Please enter your email address';
                         }
-                        if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
-                            .hasMatch(value)) {
+                        final emailRegex = RegExp(
+                          r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                        );
+                        if (!emailRegex.hasMatch(value)) {
                           return 'Please enter a valid email address';
                         }
                         return null;
@@ -238,10 +267,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   children: [
                     const Text(
                       'Password',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.black54,
-                      ),
+                      style: TextStyle(fontSize: 14, color: Colors.black54),
                     ),
                     const SizedBox(height: 8),
                     TextFormField(
@@ -259,7 +285,9 @@ class _SignupScreenState extends State<SignupScreen> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Colors.deepPurple),
+                          borderSide: const BorderSide(
+                            color: Colors.deepPurple,
+                          ),
                         ),
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
@@ -285,10 +313,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   children: [
                     const Text(
                       'Confirm Password',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.black54,
-                      ),
+                      style: TextStyle(fontSize: 14, color: Colors.black54),
                     ),
                     const SizedBox(height: 8),
                     TextFormField(
@@ -306,7 +331,9 @@ class _SignupScreenState extends State<SignupScreen> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Colors.deepPurple),
+                          borderSide: const BorderSide(
+                            color: Colors.deepPurple,
+                          ),
                         ),
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
@@ -332,10 +359,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   children: [
                     const Text(
                       'Select Interface',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.black54,
-                      ),
+                      style: TextStyle(fontSize: 14, color: Colors.black54),
                     ),
                     const SizedBox(height: 8),
                     Row(
@@ -350,26 +374,29 @@ class _SignupScreenState extends State<SignupScreen> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               decoration: BoxDecoration(
-                                color: _selectedInterface == 'Management'
-                                    ? Colors.deepPurple
-                                    : Colors.white,
+                                color:
+                                    _selectedInterface == 'Management'
+                                        ? Colors.deepPurple
+                                        : Colors.white,
                                 borderRadius: const BorderRadius.only(
                                   topLeft: Radius.circular(8),
                                   bottomLeft: Radius.circular(8),
                                 ),
                                 border: Border.all(
-                                  color: _selectedInterface == 'Management'
-                                      ? Colors.deepPurple
-                                      : Colors.grey.shade300,
+                                  color:
+                                      _selectedInterface == 'Management'
+                                          ? Colors.deepPurple
+                                          : Colors.grey.shade300,
                                 ),
                               ),
                               child: Text(
                                 'Management',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  color: _selectedInterface == 'Management'
-                                      ? Colors.white
-                                      : Colors.black87,
+                                  color:
+                                      _selectedInterface == 'Management'
+                                          ? Colors.white
+                                          : Colors.black87,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -386,26 +413,29 @@ class _SignupScreenState extends State<SignupScreen> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               decoration: BoxDecoration(
-                                color: _selectedInterface == 'Production'
-                                    ? Colors.deepPurple
-                                    : Colors.white,
+                                color:
+                                    _selectedInterface == 'Production'
+                                        ? Colors.deepPurple
+                                        : Colors.white,
                                 borderRadius: const BorderRadius.only(
                                   topRight: Radius.circular(8),
                                   bottomRight: Radius.circular(8),
                                 ),
                                 border: Border.all(
-                                  color: _selectedInterface == 'Production'
-                                      ? Colors.deepPurple
-                                      : Colors.grey.shade300,
+                                  color:
+                                      _selectedInterface == 'Production'
+                                          ? Colors.deepPurple
+                                          : Colors.grey.shade300,
                                 ),
                               ),
                               child: Text(
                                 'Production',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  color: _selectedInterface == 'Production'
-                                      ? Colors.white
-                                      : Colors.black87,
+                                  color:
+                                      _selectedInterface == 'Production'
+                                          ? Colors.white
+                                          : Colors.black87,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),

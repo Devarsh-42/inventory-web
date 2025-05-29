@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:visionapp/presentation/auth/login_screen.dart';
-import 'package:visionapp/presentation/auth/splash_screen.dart';
+import 'package:visionapp/view/auth/login_screen.dart';
+import 'package:visionapp/view/auth/splash_screen.dart';
 
 void main() async {
   await Supabase.initialize(

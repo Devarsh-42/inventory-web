@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:visionapp/view/management/order_details_screen.dart';
-import 'package:visionapp/view/management/orders.dart';
+import '../../../models/orders.dart';
 
 class BottomNavigation extends StatelessWidget {
   final int currentIndex;
@@ -25,17 +25,12 @@ class BottomNavigation extends StatelessWidget {
             }
             break;
           case 1:
-            if (currentIndex != 1) {
-              Navigator.push(context, MaterialPageRoute(builder: (context) => const OrdersScreen()));
-            }
-            break;
-          case 2:
             if (currentIndex != 2) {
               Navigator.pushReplacementNamed(context, '/orders');
             // This should be replaced with the actual inventory screen route
             }
             break;
-          case 3:
+          case 2:
             if (currentIndex != 3) {
               Navigator.pushReplacementNamed(context, '/orders');
             // This should be replaced with the actual reports screen route
@@ -47,10 +42,6 @@ class BottomNavigation extends StatelessWidget {
         BottomNavigationBarItem(
           icon: Icon(Icons.dashboard),
           label: 'Dashboard',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.shopping_cart),
-          label: 'Orders',
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.inventory),

@@ -1,18 +1,18 @@
-import 'package:flutter/material.dart';
-import '../presentation/models/maintenance.dart';
+// import 'package:flutter/material.dart';
+// import '../presentation/models/maintenance.dart';
 
-class MaintenanceViewModel extends ChangeNotifier {
-  List<Maintenance> _alerts = [];
+// class MaintenanceViewModel extends ChangeNotifier {
+//   List<Maintenance> _alerts = [];
 
-  List<Maintenance> get alerts => _alerts;
+//   List<Maintenance> get alerts => _alerts;
 
-  void reportMaintenance(Maintenance alert) {
-    _alerts.add(alert);
-    notifyListeners();
-  }
+//   void reportMaintenance(Maintenance alert) {
+//     _alerts.add(alert);
+//     notifyListeners();
+//   }
 
-  void loadAlerts() {
-    // TODO: Load from database
-    notifyListeners();
-  }
-}
+//   void loadAlerts() {
+//     // TODO: Load from database
+//     notifyListeners();
+//   }
+// }

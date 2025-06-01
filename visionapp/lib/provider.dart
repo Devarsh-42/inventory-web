@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:visionapp/repositories/production_repository.dart';
+import 'package:visionapp/repositories/client_repository.dart'; // Add this import
 
 // Import your ViewModels
 import 'viewmodels/authentication_viewmodel.dart';
@@ -9,59 +11,22 @@ import 'viewmodels/maintenence_viewmodel.dart';
 import 'viewmodels/reports_viewmodel.dart';
 import 'viewmodels/calander_viewmodel.dart';
 import 'viewmodels/vendor_viewmodel.dart';
+import 'viewmodels/production_viewmodel.dart';
+import 'viewmodels/client_viewmodel.dart'; // Add this import
 
 /// A centralized class that returns all ChangeNotifierProviders
 /// This is used in main.dart inside MultiProvider
 class AppProviders {
-static List<ChangeNotifierProvider> getAllProviders() {
-return [
-ChangeNotifierProvider<AuthenticationViewModel>(
-create: () => AuthenticationViewModel(),
-),
-ChangeNotifierProvider<InventoryViewModel>(
-create: () => InventoryViewModel(),
-),
-ChangeNotifierProvider<OrdersViewModel>(
-create: () => OrdersViewModel(),
-),
-ChangeNotifierProvider<MaintenanceViewModel>(
-create: () => MaintenanceViewModel(),
-),
-ChangeNotifierProvider<ReportsViewModel>(
-create: () => ReportsViewModel(),
-),
-ChangeNotifierProvider<CalendarViewModel>(
-create: () => CalendarViewModel(),
-),
-ChangeNotifierProvider<VendorViewModel>(
-create: (_) => VendorViewModel(),
-),
-];
-}
-}
-
-Then in your main.dart, you use it like this:
-
-void main() {
-runApp(const MyApp());
-}
-
-class MyApp extends StatelessWidget {
-const MyApp({super.key});
-
-@override
-Widget build(BuildContext context) {
-return MultiProvider(
-providers: AppProviders.getAllProviders(),
-child: MaterialApp(
-debugShowCheckedModeBanner: false,
-title: 'Inventory Management App',
-theme: ThemeData(
-useMaterial3: true,
-primarySwatch: Colors.blue,
-),
-home: SplashScreen(), // or LoginScreen
-),
-);
-}
+  static List<ChangeNotifierProvider> providers = [
+    ChangeNotifierProvider<OrdersViewModel>(
+      create: (_) => OrdersViewModel(),
+    ),
+    ChangeNotifierProvider(
+      create: (context) => ProductionViewModel(ProductionRepository()),
+    ),
+    // Add ClientViewModel provider
+    ChangeNotifierProvider<ClientViewModel>(
+      create: (context) => ClientViewModel(ClientRepository()),
+    ),
+  ];
 }

@@ -1,115 +1,137 @@
 import 'package:flutter/material.dart';
 
-/// Enum representing the different priority levels for an order
-enum OrderPriority {
-  standard,
-  high,
-  urgent,
+class Order {
+  final String id;
+  final String clientId;
+  final String clientName;
+  final List<ProductItem> products;
+  final DateTime dueDate;
+  final DateTime createdDate;
+  final OrderStatus status;
+  final Priority priority;
+  final String? specialInstructions;
+
+  Order({
+    required this.id,
+    required this.clientId,
+    required this.clientName,
+    required this.products,
+    required this.dueDate,
+    required this.createdDate,
+    required this.status,
+    this.priority = Priority.normal,
+    this.specialInstructions,
+  });
+
+  factory Order.fromJson(Map<String, dynamic> json) {
+    return Order(
+      id: json['id'],
+      clientId: json['client_id'],
+      clientName: json['client_name'],
+      products: (json['products'] as List)
+          .map((item) => ProductItem.fromJson(item))
+          .toList(),
+      dueDate: DateTime.parse(json['due_date']),
+      createdDate: DateTime.parse(json['created_date']),
+      status: OrderStatus.values.firstWhere(
+        (e) => e.toString().split('.').last.toLowerCase() == json['status'].toLowerCase(),
+        orElse: () => OrderStatus.queued,
+      ),
+      priority: Priority.values.firstWhere(
+        (e) => e.toString().split('.').last.toLowerCase() == json['priority'].toLowerCase(),
+        orElse: () => Priority.normal,
+      ),
+      specialInstructions: json['special_instructions'],
+    );
+  }
+  Map<String, dynamic> toJson() {
+    final map = {
+      'client_id': clientId,
+      'client_name': clientName,
+      'products': products.map((item) => item.toJson()).toList(),
+      'due_date': dueDate.toIso8601String(),
+      'status': status.toString().split('.').last.toLowerCase(),
+      'priority': priority.toString().split('.').last.toLowerCase(),
+      'special_instructions': specialInstructions,
+    };
+    
+    // Only include id and created_date for existing records
+    if (id.isNotEmpty) {
+      map['id'] = id;
+      map['created_date'] = createdDate.toIso8601String();
+    }
+    
+    return map;
+  }
+
+  int get totalUnits {
+    return products.fold(0, (sum, product) => sum + product.quantity);
+  }
+
+  int get completedUnits {
+    return products.fold(0, (sum, product) => sum + product.completed);
+  }
+
+  double get progress {
+    if (totalUnits == 0) return 0;
+    return completedUnits / totalUnits;
+  }
 }
 
-/// Enum representing the possible statuses of an order
+class ProductItem {
+  final String name;
+  final int quantity;
+  final int completed;
+
+  ProductItem({
+    required this.name,
+    required this.quantity,
+    this.completed = 0,
+  });
+
+  factory ProductItem.fromJson(Map<String, dynamic> json) {
+    return ProductItem(
+      name: json['name'],
+      quantity: json['quantity'],
+      completed: json['completed'] ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+      'quantity': quantity,
+      'completed': completed,
+    };
+  }
+
+  double get progress {
+    if (quantity == 0) return 0;
+    return completed / quantity;
+  }
+
+  ProductItem copyWith({
+    String? name,
+    int? quantity,
+    int? completed,
+  }) {
+    return ProductItem(
+      name: name ?? this.name,
+      quantity: quantity ?? this.quantity,
+      completed: completed ?? this.completed,
+    );
+  }
+}
+
 enum OrderStatus {
   queued,
   inProduction,
   completed,
-  delayed,
+  paused,
 }
 
-/// Entity class representing an Order in the system
-class Order {
-  final String id;/// Unique identifier for the order
-  final String client;/// Name of the client who placed the order
-  final String product;/// Product being ordered
-  final int quantity; /// Quantity of the product ordered
-  final DateTime dueDate;/// Due date for the order completion
-  final OrderStatus status;/// Current status of the order
-  final OrderPriority priority;/// Priority level of the order  
-  final String? notes; /// Optional notes for the order
-  final DateTime createdAt;/// Date when the order was created
-  final DateTime updatedAt;/// Date when the order was last updated
-
-  /// Constructor for the Order class
-  Order({
-    required this.id,
-    required this.client,
-    required this.product,
-    required this.quantity,
-    required this.dueDate,
-    required this.status,
-    required this.priority,
-    this.notes,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-  })  : createdAt = createdAt ?? DateTime.now(),
-        updatedAt = updatedAt ?? DateTime.now();
-
-  /// Creates a copy of this Order with the specified fields replaced with new values
-  Order copyWith({
-    String? id,
-    String? client,
-    String? product,
-    int? quantity,
-    DateTime? dueDate,
-    OrderStatus? status,
-    OrderPriority? priority,
-    String? notes,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-  }) {
-    return Order(
-      id: id ?? this.id,
-      client: client ?? this.client,
-      product: product ?? this.product,
-      quantity: quantity ?? this.quantity,
-      dueDate: dueDate ?? this.dueDate,
-      status: status ?? this.status,
-      priority: priority ?? this.priority,
-      notes: notes ?? this.notes,
-      createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? DateTime.now(),
-    );
-  }
-
-  /// Converts the Order to a Map for storage or transmission
-  Map<String, dynamic> toMap() {
-    return {
-      'id': id,
-      'client': client,
-      'product': product,
-      'quantity': quantity,
-      'dueDate': dueDate.millisecondsSinceEpoch,
-      'status': status.index,
-      'priority': priority.index,
-      'notes': notes,
-      'createdAt': createdAt.millisecondsSinceEpoch,
-      'updatedAt': updatedAt.millisecondsSinceEpoch,
-    };
-  }
-
-  /// Creates an Order from a Map
-  factory Order.fromMap(Map<String, dynamic> map) {
-    return Order(
-      id: map['id'] as String,
-      client: map['client'] as String,
-      product: map['product'] as String,
-      quantity: map['quantity'] as int,
-      dueDate: DateTime.fromMillisecondsSinceEpoch(map['dueDate'] as int),
-      status: OrderStatus.values[map['status'] as int],
-      priority: OrderPriority.values[map['priority'] as int],
-      notes: map['notes'] as String?,
-      createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] as int),
-      updatedAt: DateTime.fromMillisecondsSinceEpoch(map['updatedAt'] as int),
-    );
-  }
-  
-  /// Returns true if the order is past its due date but not completed
-  bool get isOverdue {
-    return dueDate.isBefore(DateTime.now()) && status != OrderStatus.completed;
-  }
-  
-  /// Returns the number of days remaining until the due date
-  int get daysRemaining {
-    final today = DateTime.now();
-    return dueDate.difference(today).inDays;
-  }
+enum Priority {
+  normal,
+  high,
+  urgent,
 }

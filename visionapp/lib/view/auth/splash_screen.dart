@@ -57,8 +57,8 @@ class _SplashScreenState extends State<SplashScreen>
 
   void _redirect() async{
     await Future.delayed(const Duration(seconds: 1));
-    final Session = supabase.auth.currentSession;
-    if (Session != null) {
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session != null) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const LoginScreen()),

@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:visionapp/models/orders.dart';
+import 'package:provider/provider.dart';
+import 'package:visionapp/view/management/AddNewOrders_Screen.dart';
+import 'package:visionapp/view/widgets/status_update_dialog.dart';
+import '../../models/orders.dart';
+import '../../viewmodels/orders_viewmodel.dart';
+import '../../viewmodels/client_viewmodel.dart';
+import '../../view/widgets/alert_dialogs.dart';
 
-class OrderDetailsScreen extends StatelessWidget {
+// Change the class to StatefulWidget
+class OrderDetailsScreen extends StatefulWidget {
   final Order order;
 
   const OrderDetailsScreen({
@@ -10,10 +17,23 @@ class OrderDetailsScreen extends StatelessWidget {
   }) : super(key: key);
 
   @override
+  State<OrderDetailsScreen> createState() => _OrderDetailsScreenState();
+}
+
+class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<ClientViewModel>(context, listen: false).ensureClientsLoaded();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Order #${order.id}'),
+        title: Text('Order #${widget.order.id.substring(0, 8)}'),
         backgroundColor: const Color(0xFF6E00FF),
         foregroundColor: Colors.white,
       ),
@@ -22,104 +42,190 @@ class OrderDetailsScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Order header with priority
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Order #${order.id}',
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                _getPriorityTag(order.priority),
-              ],
-            ),
+            _buildOrderHeader(),
             const Divider(height: 32),
-            
-            // Order details
-            _buildDetailRow('Client', order.client),
-            _buildDetailRow('Product', order.product),
-            _buildDetailRow('Quantity', order.quantity.toString()),
-            _buildDetailRow('Due Date', _formatDate(order.dueDate)),
-            _buildDetailRow('Status', _getStatusText(order.status)),
-            
-            const SizedBox(height: 32),
-            
-            // Action buttons
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      // Edit order logic
-                    },
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF6E00FF),
-                      side: const BorderSide(color: Color(0xFF6E00FF)),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                    child: const Text('Edit Order'),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      // Update status logic
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF6E00FF),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                    child: const Text('Update Status'),
-                  ),
-                ),
-              ],
-            ),
-            
-            const SizedBox(height: 32),
-            
-            // Production timeline
-            const Text(
-              'Production Timeline',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            _buildOrderDetails(),
             const SizedBox(height: 16),
-            _buildTimelineItem(
-              'Order Created', 
-              DateTime.now().subtract(const Duration(days: 5)),
-              true,
-            ),
-            _buildTimelineItem(
-              'Materials Prepared', 
-              DateTime.now().subtract(const Duration(days: 3)),
-              true,
-            ),
-            _buildTimelineItem(
-              'Production Started', 
-              DateTime.now().subtract(const Duration(days: 1)),
-              true,
-            ),
-            _buildTimelineItem(
-              'Quality Control', 
-              DateTime.now().add(const Duration(days: 2)),
-              false,
-            ),
-            _buildTimelineItem(
-              'Shipping', 
-              DateTime.now().add(const Duration(days: 5)),
-              false,
-            ),
+            _buildProgressSection(),
+            const SizedBox(height: 32),
+            _buildProductsList(),
+            const SizedBox(height: 32),
+            _buildActionButtons(context),
+            const SizedBox(height: 32),
+            _buildTimelineSection(),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildOrderHeader() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Order Details',
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                widget.order.clientName,
+                style: const TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey,
+                ),
+              ),
+            ],
+          ),
+        ),
+        _getPriorityTag(widget.order.priority),
+      ],
+    );
+  }
+
+  Widget _buildProgressSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Overall Progress',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 8),
+        LinearProgressIndicator(
+          value: widget.order.progress,
+          backgroundColor: Colors.grey[200],
+          valueColor: AlwaysStoppedAnimation<Color>(
+            widget.order.progress == 1 ? Colors.green : const Color(0xFF6E00FF),
+          ),
+          minHeight: 10,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '${(widget.order.progress * 100).toStringAsFixed(1)}% Complete',
+          style: const TextStyle(
+            fontWeight: FontWeight.w500,
+            color: Colors.grey,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProductsList() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Products',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 16),
+        ...widget.order.products.map((product) => Card(
+          margin: const EdgeInsets.only(bottom: 8),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [                Text(                  product.name,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Quantity: ${product.quantity}'),
+                    Text('Completed: ${product.completed}'),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                LinearProgressIndicator(
+                  value: product.completed / product.quantity,
+                  backgroundColor: Colors.grey[200],
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    product.completed == product.quantity 
+                        ? Colors.green 
+                        : const Color(0xFF6E00FF),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        )).toList(),
+      ],
+    );
+  }
+
+  Widget _buildActionButtons(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton(
+            onPressed: () => _editOrder(context),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF6E00FF),
+              side: const BorderSide(color: Color(0xFF6E00FF)),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+            child: const Text('Edit Order'),
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: ElevatedButton(
+            onPressed: () => _updateStatus(context),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF6E00FF),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+            child: const Text('Update Status'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildOrderDetails() {
+    return Consumer<ClientViewModel>(
+      builder: (context, clientViewModel, child) {
+        final client = clientViewModel.getClientById(widget.order.clientId);
+        
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildDetailRow('Order ID', widget.order.id),
+            _buildDetailRow('Client', widget.order.clientName),
+            if (client != null) ...[
+              _buildDetailRow('Email', client.email),
+              _buildDetailRow('Phone', client.phone),
+              if (client.address != null)
+                _buildDetailRow('Address', client.address!),
+            ],
+            _buildDetailRow('Order Date', _formatDate(widget.order.createdDate)),
+            _buildDetailRow('Due Date', _formatDate(widget.order.dueDate)),
+            _buildDetailRow('Status', _getStatusText(widget.order.status)),
+            if (widget.order.specialInstructions?.isNotEmpty ?? false)
+              _buildDetailRow('Special Instructions', widget.order.specialInstructions!),
+          ],
+        );
+      },
     );
   }
 
@@ -150,6 +256,47 @@ class OrderDetailsScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildTimelineSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Production Timeline',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 16),
+        _buildTimelineItem(
+          'Order Created', 
+          DateTime.now().subtract(const Duration(days: 5)),
+          true,
+        ),
+        _buildTimelineItem(
+          'Materials Prepared', 
+          DateTime.now().subtract(const Duration(days: 3)),
+          true,
+        ),
+        _buildTimelineItem(
+          'Production Started', 
+          DateTime.now().subtract(const Duration(days: 1)),
+          true,
+        ),
+        _buildTimelineItem(
+          'Quality Control', 
+          DateTime.now().add(const Duration(days: 2)),
+          false,
+        ),
+        _buildTimelineItem(
+          'Shipping', 
+          DateTime.now().add(const Duration(days: 5)),
+          false,
+        ),
+      ],
     );
   }
 
@@ -210,20 +357,20 @@ class OrderDetailsScreen extends StatelessWidget {
     );
   }
 
-  Widget _getPriorityTag(OrderPriority priority) {
+  Widget _getPriorityTag(Priority priority) {
     String text;
     Color backgroundColor;
 
     switch (priority) {
-      case OrderPriority.urgent:
+      case Priority.urgent:
         text = 'Urgent';
         backgroundColor = Colors.red;
         break;
-      case OrderPriority.high:
+      case Priority.high:
         text = 'High';
         backgroundColor = Colors.amber;
         break;
-      case OrderPriority.standard:
+      case Priority.normal:
         text = 'Standard';
         backgroundColor = Colors.green;
         break;
@@ -253,8 +400,8 @@ class OrderDetailsScreen extends StatelessWidget {
         return 'In Production';
       case OrderStatus.completed:
         return 'Completed';
-      case OrderStatus.delayed:
-        return 'Delayed';
+      case OrderStatus.paused:
+        return 'Paused';
     }
   }
 
@@ -268,5 +415,42 @@ class OrderDetailsScreen extends StatelessWidget {
       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
     ];
     return months[month];
+  }
+
+  void _editOrder(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddOrderScreen(orderToEdit: widget.order),
+      ),
+    );
+  }
+
+  void _updateStatus(BuildContext context) async {
+    final newStatus = await showDialog<OrderStatus>(
+      context: context,
+      builder: (context) => StatusUpdateDialog(currentStatus: widget.order.status),
+    );
+
+    if (newStatus != null && newStatus != widget.order.status) {
+      try {
+        await Provider.of<OrdersViewModel>(context, listen: false)
+            .updateOrderStatus(widget.order.id, newStatus);
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Order status updated successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update status: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }

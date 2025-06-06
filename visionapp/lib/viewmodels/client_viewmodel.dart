@@ -96,10 +96,22 @@ class ClientViewModel extends ChangeNotifier {
     if (query.isEmpty) return _clients;
    
     return _clients.where((client) {
-      return client.name.toLowerCase().contains(query.toLowerCase()) ||
-             client.email.toLowerCase().contains(query.toLowerCase()) ||
-             client.phone.contains(query);
+      final normalizedQuery = query.toLowerCase();
+      final normalizedName = client.name.toLowerCase();
+      final normalizedPhone = client.phone?.toLowerCase() ?? '';
+      
+      return normalizedName.contains(normalizedQuery) ||
+             normalizedPhone.contains(normalizedQuery);
     }).toList();
+  }
+
+  // Get client suggestions for autocomplete
+  List<Client> getClientSuggestions(String query) {
+    if (query.isEmpty) return [];
+    
+    return _clients.where((client) =>
+      client.name.toLowerCase().contains(query.toLowerCase())
+    ).toList();
   }
 
   // Ensure clients are loaded

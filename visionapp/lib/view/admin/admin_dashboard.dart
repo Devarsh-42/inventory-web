@@ -1,14 +1,19 @@
 // lib/views/admin/admin_dashboard.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:visionapp/core/utils/responsive_helper.dart';
+import 'package:visionapp/view/admin/order_details_screen.dart';
+import 'package:visionapp/view/admin/production_management_screen.dart';
+import 'package:visionapp/view/admin/performance_management_admin_screen.dart' as production;
 import 'package:visionapp/view/management/AddNewOrders_Screen.dart';
+import 'package:visionapp/view/production/production_dashboard.dart';
 import '../../viewmodels/orders_viewmodel.dart';
 import '../../models/orders.dart';
 import '../../view/widgets/custom_button.dart';
 import '../../view/widgets/custom_textfield.dart';
-import '../../core/constants/app_scrings.dart';
+import '../../core/constants/app_scrings.dart';// Add this import
 import 'orders_management_screen.dart';
-
+import 'package:visionapp/view/admin/performance_management_admin_screen.dart';
 
 class AdminDashboard extends StatefulWidget {
   @override
@@ -17,6 +22,7 @@ class AdminDashboard extends StatefulWidget {
 
 class _AdminDashboardState extends State<AdminDashboard> {
   int _selectedIndex = 0;
+  int _selectedOrderTab = 0; // 0 for Recent Orders, 1 for Ready for Pickup
 
   @override
   void initState() {
@@ -41,6 +47,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = ResponsiveHelper.isMobile(context);
+    final isTablet = ResponsiveHelper.isTablet(context);
+    
     return Scaffold(
       backgroundColor: const Color(0xFF1E40AF),
       body: Consumer<OrdersViewModel>(
@@ -78,17 +87,17 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 ),
               ),
               child: Padding(
-                padding: const EdgeInsets.all(20.0),
+                padding: EdgeInsets.all(isMobile ? 16.0 : 20.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildHeader(),
-                    const SizedBox(height: 30),
+                    SizedBox(height: isMobile ? 20 : 30),
                     Expanded(
                       child: Container(
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.98),
-                          borderRadius: BorderRadius.circular(24),
+                          borderRadius: BorderRadius.circular(isMobile ? 16 : 24),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withOpacity(0.15),
@@ -98,13 +107,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           ],
                         ),
                         child: Padding(
-                          padding: const EdgeInsets.all(24.0),
+                          padding: EdgeInsets.all(isMobile ? 16.0 : 24.0),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildStatsGrid(),
-                              const SizedBox(height: 24),
-                              _buildRecentOrdersSection(),
+                              SizedBox(height: isMobile ? 16 : 24),
+                              _buildMainContent(),
                             ],
                           ),
                         ),
@@ -117,17 +126,20 @@ class _AdminDashboardState extends State<AdminDashboard> {
           );
         },
       ),
+      // bottomNavigationBar: isMobile ? _buildBottomNavBar() : null,
       bottomNavigationBar: _buildBottomNavBar(),
       floatingActionButton: _buildFloatingActionButton(),
     );
   }
 
   Widget _buildHeader() {
-    return const Text(
+    final isMobile = ResponsiveHelper.isMobile(context);
+    
+    return Text(
       AppStrings.dashboardTitle_admin,
       style: TextStyle(
         color: Colors.white,
-        fontSize: 28,
+        fontSize: isMobile ? 24 : 28,
         fontWeight: FontWeight.bold,
         letterSpacing: -0.5,
       ),
@@ -136,12 +148,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Widget _buildStatsGrid() {
+    final isMobile = ResponsiveHelper.isMobile(context);
+    
     return Consumer<OrdersViewModel>(
       builder: (context, viewModel, child) {
         if (viewModel.isLoading) {
           return const Center(child: CircularProgressIndicator());
         }
 
+        // Always keep stat cards side by side, but adjust spacing for mobile
         return Row(
           children: [
             Expanded(
@@ -153,7 +168,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 ),
               ),
             ),
-            const SizedBox(width: 16),
+            SizedBox(width: isMobile ? 12 : 16),
             Expanded(
               child: _buildStatCard(
                 title: 'Units in Queue',
@@ -174,8 +189,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
     required String value,
     required Gradient gradient,
   }) {
+    final isMobile = ResponsiveHelper.isMobile(context);
+    
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(isMobile ? 16 : 20),
       decoration: BoxDecoration(
         gradient: gradient,
         borderRadius: BorderRadius.circular(16),
@@ -191,9 +208,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
         children: [
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               color: Colors.white,
-              fontSize: 28,
+              fontSize: isMobile ? 24 : 28,
               fontWeight: FontWeight.w800,
               letterSpacing: -0.5,
             ),
@@ -203,7 +220,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             title,
             style: TextStyle(
               color: Colors.white.withOpacity(0.9),
-              fontSize: 12,
+              fontSize: isMobile ? 11 : 12,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.5,
             ),
@@ -214,30 +231,130 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Widget _buildRecentOrdersSection() {
+  Widget _buildMainContent() {
     return Expanded(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
+          _buildOrderTabBar(),
+          const SizedBox(height: 16),
+          Expanded(
+            child: _buildOrderContent(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOrderTabBar() {
+    final isMobile = ResponsiveHelper.isMobile(context);
+    
+    return Container(
+      height: isMobile ? 45 : 50,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildTabButton(
+              title: 'Recent Orders',
+              isSelected: _selectedOrderTab == 0,
+              onTap: () => setState(() => _selectedOrderTab = 0),
+            ),
+          ),
+          Expanded(
+            child: _buildTabButton(
+              title: 'Ready for Pickup',
+              isSelected: _selectedOrderTab == 1,
+              onTap: () => setState(() => _selectedOrderTab = 1),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabButton({
+    required String title,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    final isMobile = ResponsiveHelper.isMobile(context);
+    
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          gradient: isSelected
+              ? const LinearGradient(
+                  colors: [Color(0xFF1E40AF), Color(0xFF3B82F6)],
+                )
+              : null,
+          color: isSelected ? null : Colors.transparent,
+          borderRadius: BorderRadius.circular(9),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFF1E40AF).withOpacity(0.3),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Center(
+          child: Text(
+            title,
+            style: TextStyle(
+              color: isSelected ? Colors.white : const Color(0xFF64748B),
+              fontSize: isMobile ? 13 : 14,
+              fontWeight: FontWeight.w600,
+              letterSpacing: -0.1,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOrderContent() {
+    return _selectedOrderTab == 0 
+        ? _buildRecentOrdersContent() 
+        : _buildReadyForPickupContent();
+  }
+
+  Widget _buildRecentOrdersContent() {
+    final isMobile = ResponsiveHelper.isMobile(context);
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Text(
                 'Recent Orders',
                 style: TextStyle(
-                  color: Color(0xFF1F2937),
-                  fontSize: 20,
+                  color: const Color(0xFF1F2937),
+                  fontSize: isMobile ? 18 : 20,
                   fontWeight: FontWeight.bold,
                   letterSpacing: -0.3,
                 ),
               ),
-              Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.refresh),
-                    onPressed: () => _loadData(),
-                    color: const Color(0xFF1E40AF),
-                  ),
+            ),
+            Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: () => _loadData(),
+                  color: const Color(0xFF1E40AF),
+                  iconSize: isMobile ? 20 : 24,
+                ),
+                if (!isMobile)
                   TextButton(
                     onPressed: () => _navigateToOrdersManagement(),
                     child: const Text(
@@ -248,117 +365,202 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       ),
                     ),
                   ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: Consumer<OrdersViewModel>(
-              builder: (context, viewModel, child) {
-                if (viewModel.isLoading) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                if (viewModel.orders.isEmpty) {
-                  return const Center(
-                    child: Text(
-                      'No orders found',
-                      style: TextStyle(
-                        color: Color(0xFF6B7280),
-                        fontSize: 16,
-                      ),
-                    ),
-                  );
-                }
-
-                return ListView.builder(
-                  itemCount: viewModel.recentOrders.length,
-                  itemBuilder: (context, index) {
-                    final order = viewModel.recentOrders[index];
-                    return _buildOrderCard(order);
-                  },
-                );
-              },
+              ],
             ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Expanded(
+          child: Consumer<OrdersViewModel>(
+            builder: (context, viewModel, child) {
+              if (viewModel.isLoading) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              if (viewModel.orders.isEmpty) {
+                return const Center(
+                  child: Text(
+                    'No recent orders found',
+                    style: TextStyle(
+                      color: Color(0xFF6B7280),
+                      fontSize: 16,
+                    ),
+                  ),
+                );
+              }
+
+              return ListView.builder(
+                itemCount: viewModel.recentOrders.length,
+                itemBuilder: (context, index) {
+                  final order = viewModel.recentOrders[index];
+                  return _buildOrderCard(order);
+                },
+              );
+            },
           ),
-        ],
-      ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReadyForPickupContent() {
+    final isMobile = ResponsiveHelper.isMobile(context);
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Text(
+                'Ready for Pickup',
+                style: TextStyle(
+                  color: const Color(0xFF1F2937),
+                  fontSize: isMobile ? 18 : 20,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: -0.3,
+                ),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: () => _loadData(),
+              color: const Color(0xFF1E40AF),
+              iconSize: isMobile ? 20 : 24,
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Expanded(
+          child: Consumer<OrdersViewModel>(
+            builder: (context, viewModel, child) {
+              if (viewModel.isLoading) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              final completedOrders = viewModel.completedOrders;
+
+              if (completedOrders.isEmpty) {
+                return const Center(
+                  child: Text(
+                    'No orders ready for pickup',
+                    style: TextStyle(
+                      color: Color(0xFF6B7280),
+                      fontSize: 16,
+                    ),
+                  ),
+                );
+              }
+
+              return ListView.builder(
+                itemCount: completedOrders.length,
+                itemBuilder: (context, index) {
+                  final order = completedOrders[index];
+                  return _buildOrderCard(order);
+                },
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildOrderCard(Order order) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: const Color(0xFFF1F5F9), width: 2),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF1E40AF).withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          if (order.priority == Priority.high)
-            Positioned(
-              top: 0,
-              right: 0,
-              child: CustomPaint(
-                size: const Size(30, 30),
-                painter: TrianglePainter(),
+    final isMobile = ResponsiveHelper.isMobile(context);
+    
+    // Get priority color
+    Color priorityColor;
+    switch (order.priority) {
+      case Priority.normal:
+        priorityColor = const Color(0xFFDC2626);
+      case Priority.high:
+        priorityColor = const Color(0xFFFACC15);
+      case Priority.urgent:
+        priorityColor = const Color(0xFF22C55E);
+    }
+
+    return InkWell(
+      onTap: () => _onOrderCardTap(order),
+      child: Container(
+        margin: EdgeInsets.only(bottom: isMobile ? 12 : 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: const Color(0xFFF1F5F9), width: 2),
+          borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF1E40AF).withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            if (order.priority != Priority.normal)
+              Positioned(
+                top: 0,
+                right: 0,
+                child: CustomPaint(
+                  size: Size(isMobile ? 25 : 30, isMobile ? 25 : 30),
+                  painter: TrianglePainter(color: priorityColor),
+                ),
+              ),
+            Padding(
+              padding: EdgeInsets.all(isMobile ? 14 : 18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${order.clientName} #${order.displayId}',
+                              style: TextStyle(
+                                color: const Color(0xFF111827),
+                                fontSize: isMobile ? 14 : 16,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: -0.2,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${order.products.length} Products • Due ${_formatDate(order.dueDate)}',
+                              style: TextStyle(
+                                color: const Color(0xFF6B7280),
+                                fontSize: isMobile ? 12 : 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: isMobile ? 12 : 14),
+                  _buildStatusBadge(order.status),
+                ],
               ),
             ),
-          Padding(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Order #${order.id} - ${order.clientName}',
-                            style: const TextStyle(
-                              color: Color(0xFF111827),
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: -0.2,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${order.products.length} Products • Due ${_formatDate(order.dueDate)}',
-                            style: const TextStyle(
-                              color: Color(0xFF6B7280),
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                _buildStatusBadge(order.status),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildStatusBadge(OrderStatus status) {
+    final isMobile = ResponsiveHelper.isMobile(context);
+    
     Color backgroundColor;
     String text;
 
@@ -382,7 +584,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 10 : 14, 
+        vertical: isMobile ? 6 : 8
+      ),
       decoration: BoxDecoration(
         color: backgroundColor,
         borderRadius: BorderRadius.circular(24),
@@ -396,9 +601,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
       ),
       child: Text(
         text,
-        style: const TextStyle(
+        style: TextStyle(
           color: Colors.white,
-          fontSize: 11,
+          fontSize: isMobile ? 10 : 11,
           fontWeight: FontWeight.bold,
           letterSpacing: 0.8,
         ),
@@ -420,8 +625,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
         children: [
           _buildNavItem(0, 'Dashboard', Icons.dashboard),
           _buildNavItem(1, 'Orders', Icons.shopping_cart),
-          _buildNavItem(2, 'Production', Icons.factory),
-          _buildNavItem(3, 'Reports', Icons.bar_chart),
+          _buildNavItem(2, 'Performance', Icons.bar_chart),
+          _buildNavItem(3, 'Production', Icons.factory),
         ],
       ),
     );
@@ -466,14 +671,17 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Widget _buildFloatingActionButton() {
+    final isMobile = ResponsiveHelper.isMobile(context);
+    final size = isMobile ? 56.0 : 60.0;
+    
     return Container(
-      width: 60,
-      height: 60,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFF1E40AF), Color(0xFF3B82F6)],
         ),
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(size / 2),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF1E40AF).withOpacity(0.4),
@@ -486,10 +694,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
         onPressed: () => _navigateToOrderPlacement(),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        child: const Icon(
+        child: Icon(
           Icons.add,
           color: Colors.white,
-          size: 24,
+          size: isMobile ? 22 : 24,
         ),
       ),
     );
@@ -505,10 +713,20 @@ class _AdminDashboardState extends State<AdminDashboard> {
         _navigateToOrdersManagement();
         break;
       case 2:
-        // Navigate to production dashboard
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => PerformanceManagementScreen()),
+        );
         break;
       case 3:
-        // Navigate to reports
+        // Navigate to production management
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => ProductionManagementScreen()),
+        );
+        break;
+      case 4:
+        // Navigate to reports management
         break;
     }
   }
@@ -527,16 +745,31 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
+  void _onOrderCardTap(Order order) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => OrderDetailsScreen(
+          order: order,
+        ),
+      ),
+    );
+  }
+
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}/${date.year}';
   }
 }
 
 class TrianglePainter extends CustomPainter {
+  final Color color;
+  
+  TrianglePainter({this.color = const Color(0xFFEF4444)});
+
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFFEF4444)
+      ..color = color
       ..style = PaintingStyle.fill;
 
     final path = Path()

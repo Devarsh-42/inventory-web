@@ -33,27 +33,56 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Order #${widget.order.id.substring(0, 8)}'),
-        backgroundColor: const Color(0xFF6E00FF),
+        title: Text('Order #${widget.order.id}'),
+        backgroundColor: const Color(0xFF1E40AF),
         foregroundColor: Colors.white,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildOrderHeader(),
-            const Divider(height: 32),
-            _buildOrderDetails(),
-            const SizedBox(height: 16),
-            _buildProgressSection(),
-            const SizedBox(height: 32),
-            _buildProductsList(),
-            const SizedBox(height: 32),
-            _buildActionButtons(context),
-            const SizedBox(height: 32),
-            _buildTimelineSection(),
-          ],
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF1E3A8A),
+              Color(0xFF3B82F6),
+              Color(0xFF1E40AF),
+            ],
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.98),
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 25,
+                  offset: const Offset(0, 25),
+                ),
+              ],
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildOrderHeader(),
+                  const Divider(height: 32),
+                  _buildOrderDetails(),
+                  const SizedBox(height: 16),
+                  _buildProgressSection(),
+                  const SizedBox(height: 32),
+                  _buildProductsList(),
+                  const SizedBox(height: 32),
+                  _buildActionButtons(context),
+                  const SizedBox(height: 32),
+                  _buildTimelineSection(),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -140,7 +169,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [                Text(                  product.name,
+              children: [
+                Text(
+                  product.name,
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
@@ -150,8 +181,35 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Quantity: ${product.quantity}'),
-                    Text('Completed: ${product.completed}'),
+                    Expanded(
+                      child: TextFormField(
+                        initialValue: product.completed.toString(),
+                        decoration: const InputDecoration(
+                          labelText: 'Completed',
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                        ),
+                        keyboardType: TextInputType.number,
+                        onChanged: (value) {
+                          final newValue = int.tryParse(value) ?? 0;
+                          if (newValue <= product.quantity) {
+                            // Update the completed value
+                            // You'll need to implement this through your view model
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Text(
+                      'of ${product.quantity}',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -212,12 +270,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           children: [
             _buildDetailRow('Order ID', widget.order.id),
             _buildDetailRow('Client', widget.order.clientName),
-            if (client != null) ...[
-              _buildDetailRow('Email', client.email),
-              _buildDetailRow('Phone', client.phone),
-              if (client.address != null)
-                _buildDetailRow('Address', client.address!),
-            ],
+            if (client != null && client.phone != null)
+              _buildDetailRow('Phone', client.phone!),
             _buildDetailRow('Order Date', _formatDate(widget.order.createdDate)),
             _buildDetailRow('Due Date', _formatDate(widget.order.dueDate)),
             _buildDetailRow('Status', _getStatusText(widget.order.status)),
@@ -364,15 +418,15 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     switch (priority) {
       case Priority.urgent:
         text = 'Urgent';
-        backgroundColor = Colors.red;
+        backgroundColor = const Color(0xFFDC2626); // Red
         break;
       case Priority.high:
         text = 'High';
-        backgroundColor = Colors.amber;
+        backgroundColor = const Color(0xFFFACC15); // Yellow
         break;
       case Priority.normal:
         text = 'Standard';
-        backgroundColor = Colors.green;
+        backgroundColor = const Color(0xFF22C55E); // Green
         break;
     }
 

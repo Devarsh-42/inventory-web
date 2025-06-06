@@ -26,10 +26,10 @@ class OrdersRepository {
 
   Future<Order> createOrder(Order order) async {
     try {
-      // First create the order
-      final orderId = (await _supabaseService.client
-          .from(_tableName)
-          .insert({
+      // Start a Supabase transaction
+      final response = await _supabaseService.client.rpc('create_order_with_productions', 
+        params: {
+          'order_data': {
             'client_id': order.clientId,
             'client_name': order.clientName,
             'due_date': order.dueDate.toIso8601String(),
@@ -37,20 +37,13 @@ class OrdersRepository {
             'status': order.status.toString().split('.').last,
             'priority': order.priority.toString().split('.').last,
             'special_instructions': order.specialInstructions,
-          })
-          .select('id')
-          .single())['id'] as String;
-
-      // Then create the products in parallel
-      await Future.wait(
-        order.products.map((product) => _supabaseService.client
-          .from(_productsTable)
-          .insert({
-            'order_id': orderId,
+          },
+          'products_data': order.products.map((product) => ({
             'name': product.name,
             'quantity': product.quantity,
             'completed': product.completed,
-          })),
+          })).toList(),
+        }
       );
 
       // Fetch the complete order with products
@@ -60,7 +53,7 @@ class OrdersRepository {
             *,
             products:$_productsTable(*)
           ''')
-          .eq('id', orderId)
+          .eq('id', response['id'])
           .single();
 
       return Order.fromJson(completeOrder);
@@ -101,7 +94,7 @@ class OrdersRepository {
   ) async {
     try {
       await _supabaseService.client
-          .from(_productsTable)
+          .from('order_products')
           .update({'completed': completedCount})
           .eq('order_id', orderId)
           .eq('name', productName);

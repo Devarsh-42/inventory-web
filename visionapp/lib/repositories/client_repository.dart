@@ -11,7 +11,8 @@ class ClientRepository {
     try {
       final response = await _supabaseService.client
           .from(_tableName)
-          .select();
+          .select()
+          .order('name'); // Order by name for better usability
 
       return (response as List)
           .map((json) => Client.fromJson(json))
@@ -27,9 +28,7 @@ class ClientRepository {
           .from(_tableName)
           .insert({
             'name': client.name,
-            'email': client.email,
             'phone': client.phone,
-            'address': client.address,
             'is_active': client.is_active,
           })
           .select()
@@ -37,8 +36,8 @@ class ClientRepository {
 
       return Client.fromJson(response);
     } catch (e) {
-      if (e.toString().contains('clients_email_key')) {
-        throw Exception('A client with this email already exists');
+      if (e.toString().contains('clients_name_key')) {
+        throw Exception('A client with this name already exists');
       }
       throw Exception('Failed to create client: $e');
     }
@@ -48,13 +47,20 @@ class ClientRepository {
     try {
       final response = await _supabaseService.client
           .from(_tableName)
-          .update(client.toJson())
+          .update({
+            'name': client.name,
+            'phone': client.phone,
+            'is_active': client.is_active,
+          })
           .eq('id', client.id)
           .select()
           .single();
 
       return Client.fromJson(response);
     } catch (e) {
+      if (e.toString().contains('clients_name_key')) {
+        throw Exception('A client with this name already exists');
+      }
       throw Exception('Failed to update client: $e');
     }
   }
@@ -81,10 +87,26 @@ class ClientRepository {
       return Client.fromJson(response);
     } catch (e) {
       if (e.toString().contains('No rows found')) {
-        
         return null;
       }
       throw Exception('Failed to fetch client: $e');
+    }
+  }
+
+  Future<List<Client>> searchClientsByName(String query) async {
+    try {
+      final response = await _supabaseService.client
+          .from(_tableName)
+          .select()
+          .ilike('name', '%$query%')
+          .order('name')
+          .limit(10);
+
+      return (response as List)
+          .map((json) => Client.fromJson(json))
+          .toList();
+    } catch (e) {
+      throw Exception('Failed to search clients: $e');
     }
   }
 }

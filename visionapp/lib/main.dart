@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:visionapp/provider.dart';
+import 'package:visionapp/view/production/production_dashboard.dart';
 import '../../view/admin/admin_dashboard.dart';
 import 'core/services/supabase_services.dart';
 
@@ -24,7 +25,7 @@ class MyApp extends StatelessWidget {
           primarySwatch: Colors.blue,
           visualDensity: VisualDensity.adaptivePlatformDensity,
         ),
-        home: AdminDashboard(),
+        home: ProductionDashboardScreen(),
         debugShowCheckedModeBanner: false,
       ),
     );

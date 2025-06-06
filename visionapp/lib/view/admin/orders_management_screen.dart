@@ -146,6 +146,8 @@ class _OrdersManagementScreenState extends State<OrdersManagementScreen> {
           },
         ),
         const SizedBox(height: 16),
+        _buildSortOptions(),
+        const SizedBox(height: 16),
         Row(
           children: [
             Expanded(
@@ -181,6 +183,75 @@ class _OrdersManagementScreenState extends State<OrdersManagementScreen> {
           ],
         ),
       ],
+    );
+  }
+
+  Widget _buildSortOptions() {
+    return Row(
+      children: [
+        const Text(
+          'Sort by: ',
+          style: TextStyle(
+            color: Color(0xFF6B7280),
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildSortChip('Priority', OrderSortOption.priority),
+                const SizedBox(width: 8),
+                _buildSortChip('Due Date', OrderSortOption.dueDate),
+                const SizedBox(width: 8),
+                _buildSortChip('Created Date', OrderSortOption.createdDate),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSortChip(String label, OrderSortOption option) {
+    return Consumer<OrdersViewModel>(
+      builder: (context, viewModel, _) {
+        final isSelected = viewModel.currentSort == option;  // Use the getter instead of _currentSort
+        return FilterChip(
+          selected: isSelected,
+          label: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [  // Uncommented the children list
+              Text(label),
+              if (isSelected) ...[
+                const SizedBox(width: 4),
+                Icon(
+                  viewModel.sortAscending  // Use the getter instead of _sortAscending
+                      ? Icons.arrow_upward 
+                      : Icons.arrow_downward,
+                  size: 16,
+                ),
+              ],
+            ],
+          ),
+          onSelected: (_) {
+            viewModel.sortOrders(option);
+          },
+          backgroundColor: Colors.white,
+          selectedColor: const Color(0xFF1E40AF).withOpacity(0.1),
+          labelStyle: TextStyle(
+            color: isSelected 
+                ? const Color(0xFF1E40AF) 
+                : const Color(0xFF6B7280),
+            fontWeight: isSelected 
+                ? FontWeight.bold 
+                : FontWeight.normal,
+          ),
+        );
+      },
     );
   }
 
@@ -237,15 +308,28 @@ class _OrdersManagementScreenState extends State<OrdersManagementScreen> {
   }
 
   Widget _buildOrderCard(Order order) {
+    // Get color based on priority
+    Color priorityColor;
+    switch (order.priority) {
+      case Priority.urgent:
+        priorityColor = const Color(0xFFDC2626); // Red
+        break;
+      case Priority.high:
+        priorityColor = const Color(0xFFFACC15); // Yellow
+        break;
+      case Priority.normal:
+        priorityColor = const Color(0xFF22C55E); // Green
+        break;
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border.all(color: const Color(0xFFF1F5F9), width: 2),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF1E40AF).withOpacity(0.04),
+            color: Colors.black.withOpacity(0.08),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -253,15 +337,6 @@ class _OrdersManagementScreenState extends State<OrdersManagementScreen> {
       ),
       child: Stack(
         children: [
-          if (order.priority == Priority.high)
-            Positioned(
-              top: 0,
-              right: 0,
-              child: CustomPaint(
-                size: const Size(30, 30),
-                painter: TrianglePainter(),
-              ),
-            ),
           InkWell(
             onTap: () => _showOrderDetails(order),
             borderRadius: BorderRadius.circular(16),
@@ -278,7 +353,7 @@ class _OrdersManagementScreenState extends State<OrdersManagementScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Order #${order.id} - ${order.clientName}',
+                              '${order.clientName} #${order.displayId}',
                               style: const TextStyle(
                                 color: Color(0xFF111827),
                                 fontSize: 16,
@@ -297,41 +372,6 @@ class _OrdersManagementScreenState extends State<OrdersManagementScreen> {
                             ),
                           ],
                         ),
-                      ),
-                      PopupMenuButton(
-                        onSelected: (value) => _handleOrderAction(order, value),
-                        itemBuilder: (context) => [
-                          const PopupMenuItem(
-                            value: 'edit',
-                            child: Row(
-                              children: [
-                                Icon(Icons.edit, size: 20),
-                                SizedBox(width: 8),
-                                Text('Edit Order'),
-                              ],
-                            ),
-                          ),
-                          const PopupMenuItem(
-                            value: 'duplicate',
-                            child: Row(
-                              children: [
-                                Icon(Icons.copy, size: 20),
-                                SizedBox(width: 8),
-                                Text('Duplicate'),
-                              ],
-                            ),
-                          ),
-                          const PopupMenuItem(
-                            value: 'delete',
-                            child: Row(
-                              children: [
-                                Icon(Icons.delete, size: 20, color: Colors.red),
-                                SizedBox(width: 8),
-                                Text('Delete', style: TextStyle(color: Colors.red)),
-                              ],
-                            ),
-                          ),
-                        ],
                       ),
                     ],
                   ),
@@ -354,8 +394,53 @@ class _OrdersManagementScreenState extends State<OrdersManagementScreen> {
               ),
             ),
           ),
+          // Priority triangle indicator
+          Positioned(
+            top: 0,
+            right: 0, // Changed from left: 0
+            child: CustomPaint(
+              painter: TrianglePainter(color: priorityColor),
+              size: const Size(30, 30),
+            ),
+          ),
         ],
       ),
+    );
+  }
+
+  Widget _buildPriorityBadge(Priority priority) {
+    Color backgroundColor;
+    String text;
+
+    switch (priority) {
+      case Priority.urgent:
+        backgroundColor = const Color(0xFFDC2626);
+        text = 'URGENT';
+        break;
+      case Priority.high:
+        backgroundColor = const Color(0xFFFACC15);
+        text = 'HIGH';
+        break;
+      case Priority.normal:
+        backgroundColor = const Color(0xFF22C55E);
+        text = 'NORMAL';
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: priority == Priority.high ? Colors.black : Colors.white,
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+        ),
+      )
     );
   }
 
@@ -536,21 +621,25 @@ class _OrdersManagementScreenState extends State<OrdersManagementScreen> {
 }
 
 class TrianglePainter extends CustomPainter {
+  final Color color;
+
+  TrianglePainter({required this.color});
+
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFFEF4444)
+      ..color = color
       ..style = PaintingStyle.fill;
 
     final path = Path()
-      ..moveTo(size.width - 30, 0)
-      ..lineTo(size.width, 0)
-      ..lineTo(size.width, 30)
+      ..moveTo(size.width, 0) // Start from top right
+      ..lineTo(size.width, size.height) // Draw line down
+      ..lineTo(0, 0) // Draw line to top left
       ..close();
 
     canvas.drawPath(path, paint);
   }
 
   @override
-  bool shouldRepaint(CustomPainter oldDelegate) => false;
+  bool shouldRepaint(TrianglePainter oldDelegate) => color != oldDelegate.color;
 }

@@ -8,6 +8,8 @@ class OrdersViewModel extends ChangeNotifier {
   List<Order> _filteredOrders = [];
   bool _isLoading = false;
   String? _error;
+  OrderSortOption? _currentSort;
+  bool _sortAscending = true;
 
   OrdersViewModel({OrdersRepository? ordersRepository}) 
       : _ordersRepository = ordersRepository ?? OrdersRepository();
@@ -55,16 +57,24 @@ class OrdersViewModel extends ChangeNotifier {
     }
   }
 
+  // Update the searchOrders method to use displayId
   void searchOrders(String query) {
     if (query.isEmpty) {
       _filteredOrders = _orders;
     } else {
-      _filteredOrders = _orders
-          .where((order) =>
-              order.clientName.toLowerCase().contains(query.toLowerCase()) ||
-              order.id.toLowerCase().contains(query.toLowerCase()))
-          .toList();
+      final normalizedQuery = query.toLowerCase();
+      _filteredOrders = _orders.where((order) {
+        return order.clientName.toLowerCase().contains(normalizedQuery) ||
+               order.displayId.contains(normalizedQuery) ||
+               (order.specialInstructions?.toLowerCase().contains(normalizedQuery) ?? false);
+      }).toList();
     }
+    
+    // Maintain current sort if any
+    if (_currentSort != null) {
+      sortOrders(_currentSort!);
+    }
+    
     notifyListeners();
   }
 
@@ -95,12 +105,24 @@ class OrdersViewModel extends ChangeNotifier {
     int completedCount
   ) async {
     try {
+      if (completedCount < 0) {
+        throw Exception('Completed count cannot be negative');
+      }
+      
+      final order = _orders.firstWhere((o) => o.id == orderId);
+      final product = order.products.firstWhere((p) => p.name == productName);
+      
+      if (completedCount > product.quantity) {
+        throw Exception('Completed count cannot exceed total quantity');
+      }
+
       await _ordersRepository.updateProductCompletion(
-        orderId, 
+        orderId,
         productName, 
         completedCount
       );
-      await loadOrders(); // Reload orders to reflect changes
+      
+      await loadOrders();
     } catch (e) {
       _error = e.toString();
       notifyListeners();
@@ -110,7 +132,20 @@ class OrdersViewModel extends ChangeNotifier {
 
   Future<void> addOrder(Order order) async {
     try {
-      await _ordersRepository.createOrder(order);
+      final newOrder = Order(
+        id: '',
+        displayId: '',
+        clientId: order.clientId,
+        clientName: order.clientName,
+        products: order.products,
+        dueDate: order.dueDate,
+        createdDate: DateTime.now(),
+        status: OrderStatus.queued,
+        priority: order.priority,
+        specialInstructions: order.specialInstructions,
+      );
+      
+      await _ordersRepository.createOrder(newOrder);
       await loadOrders();
     } catch (e) {
       _error = e.toString();
@@ -143,4 +178,68 @@ class OrdersViewModel extends ChangeNotifier {
   int get totalUnitsInQueue => _orders
       .where((order) => order.status == OrderStatus.queued)
       .fold(0, (sum, order) => sum + order.totalUnits);
+
+  void sortOrders(OrderSortOption option) {
+    if (_currentSort == option) {
+      _sortAscending = !_sortAscending;
+    } else {
+      _currentSort = option;
+      _sortAscending = true;
+    }
+
+    _filteredOrders.sort((a, b) {
+      int comparison;
+      switch (option) {
+        case OrderSortOption.priority:
+          // Define priority weights (higher number = higher priority)
+          final priorityWeight = {
+            Priority.urgent: 3,
+            Priority.high: 2,
+            Priority.normal: 1,
+          };
+          // Compare by priority weight
+          comparison = priorityWeight[b.priority]!.compareTo(priorityWeight[a.priority]!);
+          break;
+        case OrderSortOption.dueDate:
+          comparison = a.dueDate.compareTo(b.dueDate);
+          break;
+        case OrderSortOption.createdDate:
+          comparison = a.createdDate.compareTo(b.createdDate);
+          break;
+      }
+      
+      // If priorities are equal, sort by display ID
+      if (comparison == 0) {
+        return int.parse(a.displayId).compareTo(int.parse(b.displayId));
+      }
+      
+      return _sortAscending ? -comparison : comparison;
+    });
+    
+    notifyListeners();
+  }
+
+  // Add getters for sort state
+  OrderSortOption? get currentSort => _currentSort;
+  bool get sortAscending => _sortAscending;
+
+  List<Order> get completedOrders {
+    return _orders
+        .where((order) => order.status == OrderStatus.completed)
+        .toList();
+  }
+
+  bool isClientOrdersCompleted(String clientId) {
+    final clientOrders = _orders.where((order) => order.clientId == clientId);
+    return clientOrders.isNotEmpty && 
+           clientOrders.every((order) => order.status == OrderStatus.completed);
+  }
+
+  List<Order> getCompletedOrdersByClient(String clientId) {
+    return _orders
+        .where((order) => 
+            order.clientId == clientId && 
+            order.status == OrderStatus.completed)
+        .toList();
+  }
 }

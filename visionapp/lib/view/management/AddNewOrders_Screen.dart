@@ -1,6 +1,7 @@
 // lib/views/admin/order_placement_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:visionapp/viewmodels/product_viewmodel.dart';
 import '../../viewmodels/orders_viewmodel.dart';
 import '../../viewmodels/client_viewmodel.dart';
 import '../../models/orders.dart'; // This contains the ProductItem class
@@ -35,11 +36,13 @@ class _AddOrderScreenState extends State<AddOrderScreen> {
   List<ProductItem> _orderProducts = []; // Change this line near the top of the class
   bool _isLoading = false;
 
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<ClientViewModel>(context, listen: false).loadClients();
+      Provider.of<ProductViewModel>(context, listen: false).loadProductNames(); // Changed this line
       _initializeForm();
     });
   }
@@ -50,9 +53,7 @@ class _AddOrderScreenState extends State<AddOrderScreen> {
       _selectedClient = Client(
         id: order.clientId,
         name: order.clientName,
-        email: '',
         phone: '',
-        address: '',
       );
       _selectedDueDate = order.dueDate;
       _selectedPriority = order.priority;
@@ -172,37 +173,44 @@ class _AddOrderScreenState extends State<AddOrderScreen> {
         ),
         const SizedBox(height: 12),
         Consumer<ClientViewModel>(
-          builder: (context, viewModel, _) => Container(
-            decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFFD1D5DB)),
-              borderRadius: BorderRadius.circular(12),
-              color: Colors.white,
-            ),
-            child: DropdownButtonFormField<Client>(
-              value: _selectedClient,
-              decoration: const InputDecoration(
-                hintText: 'Select Client',
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              ),
-              items: viewModel.clients.map((client) {
-                return DropdownMenuItem<Client>(
-                  value: client,
-                  child: Text(client.name),
-                );
-              }).toList(),
-              onChanged: (client) {
-                setState(() {
-                  _selectedClient = client;
-                });
-              },
-              validator: (value) {
-                if (value == null) {
-                  return 'Please select a client';
-                }
-                return null;
-              },
-            ),
+          builder: (context, viewModel, _) => Autocomplete<Client>(
+            displayStringForOption: (Client client) => client.name,
+            optionsBuilder: (TextEditingValue textEditingValue) {
+              if (textEditingValue.text == '') {
+                return const Iterable<Client>.empty();
+              }
+              return viewModel.clients.where((Client client) {
+                return client.name
+                    .toLowerCase()
+                    .contains(textEditingValue.text.toLowerCase());
+              });
+            },
+            onSelected: (Client selection) {
+              setState(() {
+                _selectedClient = selection;
+              });
+            },
+            fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
+              return TextFormField(
+                controller: textEditingController,
+                focusNode: focusNode,
+                decoration: InputDecoration(
+                  hintText: 'Search client by name',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                  ),
+                  filled: true,
+                  fillColor: Colors.white,
+                ),
+                validator: (value) {
+                  if (_selectedClient == null) {
+                    return 'Please select a client';
+                  }
+                  return null;
+                },
+              );
+            },
           ),
         ),
         const SizedBox(height: 12),
@@ -524,43 +532,11 @@ class _AddOrderScreenState extends State<AddOrderScreen> {
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
-                  controller: _emailController,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    hintText: 'Enter client email',
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter client email';
-                    }
-                    if (!value.contains('@')) {
-                      return 'Please enter a valid email';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
                   controller: _phoneController,
                   decoration: const InputDecoration(
-                    labelText: 'Phone',
+                    labelText: 'Phone (Optional)',
                     hintText: 'Enter client phone',
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter client phone';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _addressController,
-                  decoration: const InputDecoration(
-                    labelText: 'Address (Optional)',
-                    hintText: 'Enter client address',
-                  ),
-                  maxLines: 2,
                 ),
               ],
             ),
@@ -577,24 +553,20 @@ class _AddOrderScreenState extends State<AddOrderScreen> {
                 try {
                   final clientViewModel = Provider.of<ClientViewModel>(context, listen: false);
                   final newClient = Client(
-                    id: '', // ID will be generated by Supabase
                     name: _nameController.text.trim(),
-                    email: _emailController.text.trim(),
-                    phone: _phoneController.text.trim(),
-                    address: _addressController.text.trim(),
+                    phone: _phoneController.text.trim().isNotEmpty 
+                        ? _phoneController.text.trim() 
+                        : null,
                   );
                   
                   await clientViewModel.addClient(newClient);
                   
                   // Clear form fields
                   _nameController.clear();
-                  _emailController.clear();
                   _phoneController.clear();
-                  _addressController.clear();
                   
                   if (mounted) {
                     Navigator.pop(context);
-                    // Show success message
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('Client added successfully'),
@@ -621,24 +593,27 @@ class _AddOrderScreenState extends State<AddOrderScreen> {
     );
   }
 
-  void _addProduct() {
-    final productNameController = TextEditingController();
+  // Update the _showAddNewProductDialog method
+  Future<String?> _showAddNewProductDialog(BuildContext context) async {
+    final nameController = TextEditingController();
     final quantityController = TextEditingController();
     final formKey = GlobalKey<FormState>();
 
-    showDialog(
+    return showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Add Product'),
+        title: const Text('Add New Product'),
         content: Form(
           key: formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CustomTextField(
-                controller: productNameController,
-                label: 'Product Name',
-                placeholder: 'Enter product name',
+              TextFormField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Product Name',
+                  border: OutlineInputBorder(),
+                ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter product name';
@@ -647,17 +622,18 @@ class _AddOrderScreenState extends State<AddOrderScreen> {
                 },
               ),
               const SizedBox(height: 16),
-              CustomTextField(
+              TextFormField(
                 controller: quantityController,
-                label: 'Quantity',
-                placeholder: 'Enter quantity',
+                decoration: const InputDecoration(
+                  labelText: 'Quantity',
+                  border: OutlineInputBorder(),
+                ),
                 keyboardType: TextInputType.number,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter quantity';
                   }
-                  final quantity = int.tryParse(value);
-                  if (quantity == null || quantity <= 0) {
+                  if (int.tryParse(value) == null || int.parse(value) <= 0) {
                     return 'Please enter a valid quantity';
                   }
                   return null;
@@ -671,29 +647,160 @@ class _AddOrderScreenState extends State<AddOrderScreen> {
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
-          TextButton(
-            onPressed: () {
+          ElevatedButton(
+            onPressed: () async {
               if (formKey.currentState!.validate()) {
+                final newProductName = nameController.text.trim();
+                final quantity = int.parse(quantityController.text.trim());
+                
                 try {
-                  final product = ProductItem(
-                    name: productNameController.text.trim(),
+                  await Provider.of<ProductViewModel>(context, listen: false)
+                      .addProduct(newProductName, quantity);
+                  setState(() {
+                  _orderProducts.add(ProductItem(
+                    name: newProductName,
                     quantity: int.parse(quantityController.text.trim()),
                     completed: 0,
-                  );
+                  ));
+                });
 
-                  setState(() {
-                    _orderProducts.add(product);
-                  });
-
-                  Navigator.pop(context);
+                  if (mounted) {
+                    // Return the new product name to be selected
+                    Navigator.pop(context, newProductName);
+                    
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Product added successfully'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
                 } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Failed to add product: ${e.toString()}'),
+                      content: Text('Failed to add product: $e'),
                       backgroundColor: Colors.red,
                     ),
                   );
                 }
+              }
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Update the _addProduct method to reset selectedProductName
+  void _addProduct() {
+    final quantityController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    String? selectedProductName;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add Product'),
+        content: SingleChildScrollView(
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Consumer<ProductViewModel>(
+                  builder: (context, productVM, _) {
+                    if (productVM.isLoading) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    if (productVM.error != null) {
+                      return Text('Error: ${productVM.error}');
+                    }
+
+                    final productNames = productVM.productNames;
+
+                    return DropdownButtonFormField<String>(
+                      value: selectedProductName,
+                      decoration: const InputDecoration(
+                        labelText: 'Select Product',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: [
+                        ...productNames.map((name) => DropdownMenuItem(
+                          value: name,
+                          child: Text(name),
+                        )).toList(),
+                        const DropdownMenuItem(
+                          value: "ADD_NEW",
+                          child: Row(
+                            children: [
+                              Icon(Icons.add_circle_outline, 
+                                   color: Color(0xFF1E40AF)),
+                              SizedBox(width: 8),
+                              Text('Add New Product'),
+                            ],
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value == "ADD_NEW") {
+                          Navigator.pop(context);
+                          _showAddNewProductDialog(context);
+                        } else {
+                          selectedProductName = value;
+                        }
+                      },
+                      validator: (value) {
+                        if (value == null || value == "ADD_NEW") {
+                          return 'Please select a product';
+                        }
+                        return null;
+                      },
+                    );
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: quantityController,
+                  decoration: const InputDecoration(
+                    labelText: 'Quantity',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter quantity';
+                    }
+                    final quantity = int.tryParse(value);
+                    if (quantity == null || quantity <= 0) {
+                      return 'Please enter a valid quantity';
+                    }
+                    return null;
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (formKey.currentState!.validate() && 
+                  selectedProductName != null && 
+                  selectedProductName != "ADD_NEW") {
+                setState(() {
+                  _orderProducts.add(ProductItem(
+                    name: selectedProductName!,
+                    quantity: int.parse(quantityController.text.trim()),
+                    completed: 0,
+                  ));
+                });
+                Navigator.pop(context);
               }
             },
             child: const Text('Add'),
@@ -763,7 +870,8 @@ class _AddOrderScreenState extends State<AddOrderScreen> {
 
     try {
       final order = Order(
-        id: widget.orderToEdit?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        id: '', // Will be generated by database
+        displayId: '', // Will be generated by database trigger
         clientId: _selectedClient!.id,
         clientName: _selectedClient!.name,
         products: _orderProducts,
@@ -777,6 +885,7 @@ class _AddOrderScreenState extends State<AddOrderScreen> {
       );
 
       final ordersViewModel = Provider.of<OrdersViewModel>(context, listen: false);
+      final productViewModel = Provider.of<ProductViewModel>(context, listen: false);
 
       if (widget.orderToEdit != null) {
         await ordersViewModel.updateOrder(order);
@@ -785,6 +894,9 @@ class _AddOrderScreenState extends State<AddOrderScreen> {
         await ordersViewModel.addOrder(order);
         _showSuccess('Order created successfully');
       }
+
+      // Cleanup orphaned products after successful order creation/update
+      await productViewModel.cleanupOrphanedProducts();
 
       Navigator.pop(context);
     } catch (e) {
@@ -813,6 +925,33 @@ class _AddOrderScreenState extends State<AddOrderScreen> {
         return 'Normal';
       case Priority.high:
         return 'High';
+    }
+  }
+
+  void _handleProductSelection(String? productName) {
+    if (productName == null) return;
+    
+    if (productName == "ADD_NEW") {
+      _showAddNewProductDialog(context);
+    } else {
+      // Check if product already exists in order
+      if (_orderProducts.any((p) => p.name == productName)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('This product is already added to the order'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
+      setState(() {
+        _orderProducts.add(ProductItem(
+          name: productName,
+          quantity: 0,
+          completed: 0,
+        ));
+      });
     }
   }
 

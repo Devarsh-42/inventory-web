@@ -1,6 +1,6 @@
 // lib/models/product.dart
 class Product {
-  final String id;
+  final String id; // Remove optional
   final String name;
   final String description;
   final double price;
@@ -10,7 +10,7 @@ class Product {
   final DateTime updatedAt;
 
   Product({
-    required this.id,
+    required this.id, // Make required
     required this.name,
     required this.description,
     required this.price,
@@ -34,8 +34,7 @@ class Product {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final map = {
       'name': name,
       'description': description,
       'price': price,
@@ -44,6 +43,13 @@ class Product {
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
+
+    // Only include ID if it exists
+    if (id != null) {
+      map['id'] = id!;
+    }
+
+    return map;
   }
 
   Product copyWith({

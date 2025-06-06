@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:visionapp/viewmodels/product_viewmodel.dart';
 import '../../core/constants/app_scrings.dart';
 import '../../viewmodels/orders_viewmodel.dart';
 import '../../models/orders.dart';
@@ -8,9 +9,9 @@ import '../../view/widgets/custom_textfield.dart';
 import '../widgets/number_picker_dialog.dart';
 
 class OrderDetailsScreen extends StatefulWidget {
-  final Order order;
+  Order order; // Remove final keyword
 
-  const OrderDetailsScreen({Key? key, required this.order}) : super(key: key);
+  OrderDetailsScreen({Key? key, required this.order}) : super(key: key);
 
   @override
   _OrderDetailsScreenState createState() => _OrderDetailsScreenState();
@@ -30,11 +31,15 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF667eea), Color(0xFF764ba2)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF1E3A8A),
+              Color(0xFF3B82F6),
+              Color(0xFF1E40AF),
+            ],
           ),
         ),
         child: SafeArea(
@@ -50,7 +55,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                       icon: Icon(Icons.arrow_back, color: Colors.white),
                     ),
                     Text(
-                      'Order Details #${widget.order.id}',
+                      'Order Details #${widget.order.displayId}',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 20,
@@ -124,11 +129,21 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
   Widget _buildOrderHeader() {
     return Container(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Color(0xFFf8fafc),
-        border: Border.all(color: Color(0xFFe2e8f0)),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFFE5E7EB),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -142,23 +157,23 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   children: [
                     Text(
                       widget.order.clientName,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
                         color: Color(0xFF1e293b),
                       ),
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Text(
                       'Created: ${_formatDate(widget.order.createdDate)}',
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 14,
                         color: Color(0xFF64748b),
                       ),
                     ),
                     Text(
                       'Due: ${_formatDate(widget.order.dueDate)}',
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 14,
                         color: Color(0xFF64748b),
                       ),
@@ -168,14 +183,14 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               ),
               if (widget.order.priority == Priority.high)
                 Container(
-                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
+                    gradient: const LinearGradient(
                       colors: [Color(0xFFef4444), Color(0xFFdc2626)],
                     ),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Text(
+                  child: const Text(
                     'HIGH',
                     style: TextStyle(
                       color: Colors.white,
@@ -187,17 +202,17 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             ],
           ),
           
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           
           Container(
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
               gradient: _getStatusGradient(widget.order.status),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
               _getStatusText(widget.order.status),
-              style: TextStyle(
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
@@ -213,15 +228,28 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Products Ordered',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF374151),
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Products Ordered',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF374151),
+              ),
+            ),
+            TextButton.icon(
+              onPressed: _showAddProductDialog,
+              icon: const Icon(Icons.add_circle_outline, color: Color(0xFF1E40AF)),
+              label: const Text('Add Product'),
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF1E40AF),
+              ),
+            ),
+          ],
         ),
-        SizedBox(height: 12),
+        const SizedBox(height: 12),
         
         ...widget.order.products.map((product) => _buildProductItem(product)).toList(),
       ],
@@ -260,12 +288,15 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   }
 
   Widget _buildProductItem(ProductItem product) {
+    final textController = TextEditingController(text: product.completed.toString());
+    final progress = product.quantity > 0 ? product.completed / product.quantity : 0.0;
+    
     return Container(
-      padding: EdgeInsets.all(12),
-      margin: EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border.all(color: Color(0xFFf1f5f9), width: 2),
+        border: Border.all(color: const Color(0xFFf1f5f9), width: 2),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Column(
@@ -273,62 +304,61 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         children: [
           Text(
             product.name,
-            style: TextStyle(
+            style: const TextStyle(
               fontWeight: FontWeight.w600,
               color: Color(0xFF1e293b),
               fontSize: 14,
             ),
           ),
-          SizedBox(height: 4),
-          Text(
-            '${product.quantity} units • Progress: ${product.completed}/${product.quantity}',
-            style: TextStyle(
-              color: Color(0xFF64748b),
-              fontSize: 12,
-            ),
-          ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Row(
             children: [
-              Text('Completed: '),
-              SizedBox(width: 8),
-              InkWell(
-                onTap: () async {
-                  final result = await showDialog<int>(
-                    context: context,
-                    builder: (context) => NumberPickerDialog(
-                      minValue: 0,
-                      maxValue: product.quantity,
-                      initialValue: product.completed,
+              Expanded(
+                child: TextFormField(
+                  controller: textController,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Completed Units',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                  );
-                  if (result != null) {
-                    await _updateProductCompletion(product, result);
-                  }
-                },
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Color(0xFF667eea)),
-                    borderRadius: BorderRadius.circular(4),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                   ),
-                  child: Text('${product.completed}/${product.quantity}'),
+                  onChanged: (value) async {
+                    final newValue = int.tryParse(value) ?? 0;
+                    if (newValue <= product.quantity) {
+                      await _updateProductCompletion(product, newValue);
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'of ${product.quantity}',
+                style: const TextStyle(
+                  color: Color(0xFF64748b),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 8),
           Container(
             height: 8,
             decoration: BoxDecoration(
-              color: Color(0xFFf1f5f9),
+              color: const Color(0xFFf1f5f9),
               borderRadius: BorderRadius.circular(4),
             ),
             child: FractionallySizedBox(
-              widthFactor: product.progress,
+              widthFactor: progress.clamp(0.0, 1.0),
               child: Container(
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF1E40AF), Color(0xFF3B82F6)],
                   ),
                   borderRadius: BorderRadius.circular(4),
                 ),
@@ -412,13 +442,21 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   LinearGradient _getStatusGradient(OrderStatus status) {
     switch (status) {
       case OrderStatus.inProduction:
-        return LinearGradient(colors: [Color(0xFF10b981), Color(0xFF059669)]);
+        return const LinearGradient(
+          colors: [Color(0xFF1E40AF), Color(0xFF3B82F6)]
+        );
       case OrderStatus.queued:
-        return LinearGradient(colors: [Color(0xFF3b82f6), Color(0xFF2563eb)]);
+        return const LinearGradient(
+          colors: [Color(0xFFEAB308), Color(0xFFFACC15)]
+        );
       case OrderStatus.completed:
-        return LinearGradient(colors: [Color(0xFF6b7280), Color(0xFF4b5563)]);
+        return const LinearGradient(
+          colors: [Color(0xFF22C55E), Color(0xFF16A34A)]
+        );
       case OrderStatus.paused:
-        return LinearGradient(colors: [Color(0xFFf59e0b), Color(0xFFd97706)]);
+        return const LinearGradient(
+          colors: [Color(0xFFDC2626), Color(0xFFEF4444)]
+        );
     }
   }
 
@@ -439,27 +477,298 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     return '${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}/${date.year}';
   }
 
-  void _saveChanges() {
-    final ordersVM = Provider.of<OrdersViewModel>(context, listen: false);
-    ordersVM.updateOrderStatus(widget.order.id, _selectedStatus);
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Changes saved successfully!'),
-        backgroundColor: Color(0xFF10b981),
+  void _saveChanges() async {
+    try {
+      final ordersVM = Provider.of<OrdersViewModel>(context, listen: false);
+      await ordersVM.updateOrderStatus(widget.order.id, _selectedStatus);
+      
+      if (mounted) {
+        Navigator.pop(context); // Pop back to previous screen
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Changes saved successfully!'),
+            backgroundColor: Color(0xFF10b981),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving changes: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _markAsCompleted() async {
+    try {
+      final ordersVM = Provider.of<OrdersViewModel>(context, listen: false);
+      await ordersVM.updateOrderStatus(widget.order.id, OrderStatus.completed);
+      
+      if (mounted) {
+        Navigator.pop(context); // Pop back to previous screen
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Order marked as completed!'),
+            backgroundColor: Color(0xFF10b981),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error marking as completed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _showAddProductDialog() async {
+    final nameController = TextEditingController();
+    final quantityController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    return showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add New Product'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Consumer<ProductViewModel>(
+                builder: (context, productVM, _) {
+                  if (productVM.isLoading) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  if (productVM.error != null) {
+                    return Text('Error: ${productVM.error}');
+                  }
+
+                  final productNames = productVM.productNames;
+
+                  return DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(
+                      labelText: 'Select Product',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: [
+                      ...productNames.map((name) => DropdownMenuItem(
+                        value: name,
+                        child: Text(name),
+                      )).toList(),
+                      const DropdownMenuItem(
+                        value: "ADD_NEW",
+                        child: Row(
+                          children: [
+                            Icon(Icons.add_circle_outline, color: Color(0xFF1E40AF)),
+                            SizedBox(width: 8),
+                            Text('Add New Product'),
+                          ],
+                        ),
+                      ),
+                    ],
+                    onChanged: (value) async {
+                      if (value == "ADD_NEW") {
+                        Navigator.pop(context);
+                        await _showAddNewProductForm();
+                      } else {
+                        nameController.text = value!;
+                      }
+                    },
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: quantityController,
+                decoration: const InputDecoration(
+                  labelText: 'Quantity',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter quantity';
+                  }
+                  if (int.tryParse(value) == null || int.parse(value) <= 0) {
+                    return 'Please enter a valid quantity';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (formKey.currentState!.validate() && nameController.text.isNotEmpty) {
+                try {
+                  final quantity = int.parse(quantityController.text);
+                  await Provider.of<OrdersViewModel>(context, listen: false)
+                      .updateOrder(widget.order.copyWith(
+                    products: [
+                      ...widget.order.products,
+                      ProductItem(
+                        name: nameController.text,
+                        quantity: quantity,
+                        completed: 0,
+                      ),
+                    ],
+                  ));
+                  
+                  if (mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Product added successfully'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to add product: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Add'),
+          ),
+        ],
       ),
     );
   }
 
-  void _markAsCompleted() {
-    final ordersVM = Provider.of<OrdersViewModel>(context, listen: false);
-    ordersVM.updateOrderStatus(widget.order.id, OrderStatus.completed);
-    
-    Navigator.pop(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Order marked as completed!'),
-        backgroundColor: Color(0xFF10b981),
+  Future<void> _showAddNewProductForm() async {
+    final nameController = TextEditingController();
+    final quantityController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    return showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add New Product'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Product Name',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter product name';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: quantityController,
+                decoration: const InputDecoration(
+                  labelText: 'Quantity',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter quantity';
+                  }
+                  if (int.tryParse(value) == null || int.parse(value) <= 0) {
+                    return 'Please enter a valid quantity';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (formKey.currentState!.validate()) {
+                try {
+                  final productVM = Provider.of<ProductViewModel>(context, listen: false);
+                  final ordersVM = Provider.of<OrdersViewModel>(context, listen: false);
+                  final newProductName = nameController.text.trim();
+                  final quantity = int.parse(quantityController.text);
+                  
+                  // Add product to products list
+                  await productVM.addProduct(newProductName, quantity);
+                  
+                  // Create new product item
+                  final newProduct = ProductItem(
+                    name: newProductName,
+                    quantity: quantity,
+                    completed: 0,
+                  );
+                  
+                  // Create updated order with new product
+                  final updatedOrder = widget.order.copyWith(
+                    products: [
+                      ...widget.order.products,
+                      newProduct,
+                    ],
+                  );
+                  
+                  // Update order in database
+                  await ordersVM.updateOrder(updatedOrder);
+
+                  // Update local state and trigger rebuild
+                  if (mounted) {
+                    setState(() {
+                      widget.order = updatedOrder;
+                    });
+                    
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('New product added successfully'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+
+                    // Force refresh of product list
+                    await productVM.loadProductNames();
+                  }
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to add product: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Add'),
+          ),
+        ],
       ),
     );
   }

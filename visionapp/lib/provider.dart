@@ -1,32 +1,57 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'viewmodels/Production_queue_viewModel .dart'; // Add this import
+
+// Repository imports
 import 'package:visionapp/repositories/production_repository.dart';
-import 'package:visionapp/repositories/client_repository.dart'; // Add this import
+import 'package:visionapp/repositories/client_repository.dart';
+import 'package:visionapp/repositories/product_repository.dart';
+import 'package:visionapp/repositories/orders_repository.dart';
+import 'package:visionapp/repositories/production_queue_repository.dart';
 
-// Import your ViewModels
+// ViewModel imports
 import 'viewmodels/authentication_viewmodel.dart';
-import 'viewmodels/inventory_viewmodel.dart';
 import 'viewmodels/orders_viewmodel.dart';
-import 'viewmodels/maintenence_viewmodel.dart';
-import 'viewmodels/reports_viewmodel.dart';
-import 'viewmodels/calander_viewmodel.dart';
-import 'viewmodels/vendor_viewmodel.dart';
 import 'viewmodels/production_viewmodel.dart';
-import 'viewmodels/client_viewmodel.dart'; // Add this import
+import 'viewmodels/client_viewmodel.dart';
+import 'viewmodels/product_viewmodel.dart';
 
-/// A centralized class that returns all ChangeNotifierProviders
-/// This is used in main.dart inside MultiProvider
+/// A centralized class that provides all ChangeNotifierProviders
 class AppProviders {
   static List<ChangeNotifierProvider> providers = [
+    // Orders provider with repository
     ChangeNotifierProvider<OrdersViewModel>(
-      create: (_) => OrdersViewModel(),
+      create: (_) => OrdersViewModel(
+        ordersRepository: OrdersRepository(),
+      ),
     ),
-    ChangeNotifierProvider(
-      create: (context) => ProductionViewModel(ProductionRepository()),
+    
+    // Production provider
+    ChangeNotifierProvider<ProductionViewModel>(
+      create: (_) => ProductionViewModel(
+        repository: ProductionRepository(),
+      ),
     ),
-    // Add ClientViewModel provider
+    
+    // Client provider
     ChangeNotifierProvider<ClientViewModel>(
-      create: (context) => ClientViewModel(ClientRepository()),
+      create: (_) => ClientViewModel(
+        ClientRepository(),
+      ),
+    ),
+    
+    // Product provider
+    ChangeNotifierProvider<ProductViewModel>(
+      create: (_) => ProductViewModel(
+        repository: ProductRepository(),
+      ),
+    ),
+
+    // Add ProductionQueueViewModel provider
+    ChangeNotifierProvider<ProductionQueueViewModel>(
+      create: (_) => ProductionQueueViewModel(
+        repository: ProductionQueueRepository(),
+      ),
     ),
   ];
 }

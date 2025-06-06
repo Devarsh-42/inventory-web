@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
 class Order {
-  final String id;
+  final String id;        // UUID from database
+  final String displayId; // 4-digit display ID
   final String clientId;
   final String clientName;
   final List<ProductItem> products;
@@ -10,22 +11,23 @@ class Order {
   final OrderStatus status;
   final Priority priority;
   final String? specialInstructions;
-
   Order({
     required this.id,
+    required this.displayId,
     required this.clientId,
     required this.clientName,
     required this.products,
     required this.dueDate,
     required this.createdDate,
     required this.status,
-    this.priority = Priority.normal,
+    required this.priority,
     this.specialInstructions,
-  });
-
+  }) : assert(id.isEmpty || RegExp(r'^\d{4}$').hasMatch(displayId), 
+       'Order display ID must be exactly 4 digits (0-9)');
   factory Order.fromJson(Map<String, dynamic> json) {
     return Order(
       id: json['id'],
+      displayId: json['display_id'] ?? '',
       clientId: json['client_id'],
       clientName: json['client_name'],
       products: (json['products'] as List)
@@ -55,10 +57,9 @@ class Order {
       'special_instructions': specialInstructions,
     };
     
-    // Only include id and created_date for existing records
     if (id.isNotEmpty) {
       map['id'] = id;
-      map['created_date'] = createdDate.toIso8601String();
+      map['display_id'] = displayId;
     }
     
     return map;
@@ -75,6 +76,32 @@ class Order {
   double get progress {
     if (totalUnits == 0) return 0;
     return completedUnits / totalUnits;
+  }
+
+  Order copyWith({
+    String? id,
+    String? displayId,
+    String? clientId,
+    String? clientName,
+    List<ProductItem>? products,
+    DateTime? dueDate,
+    DateTime? createdDate,
+    OrderStatus? status,
+    Priority? priority,
+    String? specialInstructions,
+  }) {
+    return Order(
+      id: id ?? this.id,
+      displayId: displayId ?? this.displayId,
+      clientId: clientId ?? this.clientId,
+      clientName: clientName ?? this.clientName,
+      products: products ?? this.products,
+      dueDate: dueDate ?? this.dueDate,
+      createdDate: createdDate ?? this.createdDate,
+      status: status ?? this.status,
+      priority: priority ?? this.priority,
+      specialInstructions: specialInstructions ?? this.specialInstructions,
+    );
   }
 }
 
@@ -105,22 +132,7 @@ class ProductItem {
     };
   }
 
-  double get progress {
-    if (quantity == 0) return 0;
-    return completed / quantity;
-  }
-
-  ProductItem copyWith({
-    String? name,
-    int? quantity,
-    int? completed,
-  }) {
-    return ProductItem(
-      name: name ?? this.name,
-      quantity: quantity ?? this.quantity,
-      completed: completed ?? this.completed,
-    );
-  }
+  double get progress => quantity > 0 ? completed / quantity : 0.0;
 }
 
 enum OrderStatus {
@@ -134,4 +146,10 @@ enum Priority {
   normal,
   high,
   urgent,
+}
+
+enum OrderSortOption {
+  priority,
+  dueDate,
+  createdDate
 }

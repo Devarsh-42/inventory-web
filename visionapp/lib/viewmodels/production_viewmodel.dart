@@ -1,267 +1,147 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../models/production.dart';
 import '../repositories/production_repository.dart';
 
 class ProductionViewModel extends ChangeNotifier {
   final ProductionRepository _repository;
-  
-  List<Production> _productions = [];
   bool _isLoading = false;
   String? _error;
+  List<Production> _productions = [];
+  Map<String, dynamic> _stats = {};
+  List<String> _productNames = ['All Products'];
 
-  ProductionViewModel(this._repository);
+  ProductionViewModel({ProductionRepository? repository})
+      : _repository = repository ?? ProductionRepository();
 
   // Getters
-  List<Production> get productions => List.unmodifiable(_productions);
   bool get isLoading => _isLoading;
   String? get error => _error;
-
-  Map<String, dynamic> get productionSummary {
-    int totalProductions = _productions.length;
-    int inProgress = _productions.where((p) => p.status == ProductionStatus.inProgress).length;
-    int completed = _productions.where((p) => p.status == ProductionStatus.completed).length;
-    int planned = _productions.where((p) => p.status == ProductionStatus.planned).length;
-    
-    double averageProgress = _productions.isEmpty ? 0 :
-        _productions.fold<double>(0, (sum, p) => sum + p.progressPercentage) / _productions.length;
-
-    return {
-      'total': totalProductions,
-      'inProgress': inProgress,
-      'completed': completed,
-      'planned': planned,
-      'averageProgress': averageProgress,
-    };
-  }
-  List<Production> get activeProductions {
-    return _productions.where((p) => 
-      p.status == ProductionStatus.inProgress || 
-      p.status == ProductionStatus.planned
-    ).toList();
-  }
-
-  // Get overdue productions
-  List<Production> get overdueProductions {
-    final now = DateTime.now();
-    return _productions.where((p) => 
-      p.expectedCompletion.isBefore(now) && 
-      p.status != ProductionStatus.completed
-    ).toList();
-  }
+  List<Production> get productions => _productions;
+  Map<String, dynamic> get stats => _stats;
+  List<String> get productNames => _productNames;
 
   // Load all productions
   Future<void> loadProductions() async {
-    _setLoading(true);
-    _clearError();
-
     try {
-      _productions = await _repository.getAllProductions();
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      print('Loading productions and stats...'); // Add logging
+
+      // Load productions and stats concurrently
+      final results = await Future.wait([
+        _repository.getAllProductions(),
+        _repository.getProductionStats(),
+      ]);
+
+      print('Productions loaded: ${results[0]}'); // Add logging
+      print('Stats loaded: ${results[1]}'); // Add logging
+
+      _productions = results[0] as List<Production>;
+      _stats = results[1] as Map<String, dynamic>;
+      
+      _isLoading = false;
       notifyListeners();
     } catch (e) {
-      _setError('Failed to load productions: ${e.toString()}');
-    } finally {
-      _setLoading(false);
+      print('Error in loadProductions: $e'); // Add logging
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
   // Create new production
-  Future<void> createProduction(Production production) async {
-    _setLoading(true);
-    _clearError();
-
+  Future<Production> createProduction(Production production) async {
     try {
       final newProduction = await _repository.createProduction(production);
-      _productions.add(newProduction);
-      notifyListeners();
+      await loadProductions(); // Refresh the list
+      return newProduction;
     } catch (e) {
-      _setError('Failed to create production: ${e.toString()}');
+      _error = e.toString();
+      notifyListeners();
       rethrow;
-    } finally {
-      _setLoading(false);
     }
   }
 
   // Update production
-  Future<void> updateProduction(Production production) async {
-    _setLoading(true);
-    _clearError();
-
+  Future<void> updateProduction(String id, Map<String, dynamic> updates) async {
     try {
-      final updatedProduction = await _repository.updateProduction(production);
-      final index = _productions.indexWhere((p) => p.id == production.id);
-      if (index != -1) {
-        _productions[index] = updatedProduction;
-        notifyListeners();
-      }
+      await _repository.updateProduction(id, updates);
+      await loadProductions(); // Refresh the list
     } catch (e) {
-      _setError('Failed to update production: ${e.toString()}');
+      _error = e.toString();
+      notifyListeners();
       rethrow;
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  // Update production status
-  Future<void> updateProductionStatus(String productionId, ProductionStatus status) async {
-    _setLoading(true);
-    _clearError();
-
-    try {
-      await _repository.updateProductionStatus(productionId, status);
-      final index = _productions.indexWhere((p) => p.id == productionId);
-      if (index != -1) {
-        final production = _productions[index];
-        _productions[index] = production.copyWith(
-          status: status,
-          endDate: status == ProductionStatus.completed ? DateTime.now() : null,
-          updatedAt: DateTime.now(),
-        );
-        notifyListeners();
-      }
-    } catch (e) {
-      _setError('Failed to update production status: ${e.toString()}');
-      rethrow;
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  // Update production progress
-  Future<void> updateProgress(String productionId, int completedQuantity) async {
-    _setLoading(true);
-    _clearError();
-
-    try {
-      await _repository.updateProductionProgress(productionId, completedQuantity);
-      final index = _productions.indexWhere((p) => p.id == productionId);
-      if (index != -1) {
-        final production = _productions[index];
-        final isCompleted = completedQuantity >= production.targetQuantity;
-        
-        _productions[index] = production.copyWith(
-          completedQuantity: completedQuantity,
-          status: isCompleted ? ProductionStatus.completed : production.status,
-          endDate: isCompleted ? DateTime.now() : null,
-          updatedAt: DateTime.now(),
-        );
-        notifyListeners();
-      }
-    } catch (e) {
-      _setError('Failed to update progress: ${e.toString()}');
-      rethrow;
-    } finally {
-      _setLoading(false);
     }
   }
 
   // Get production by ID
   Production? getProductionById(String id) {
     try {
-      return _productions.firstWhere((production) => production.id == id);
+      return _productions.firstWhere((p) => p.id == id);
     } catch (e) {
       return null;
     }
   }
 
   // Add method to filter productions by status
-  List<Production> getProductionsByStatus(ProductionStatus status) {
+  List<Production> getProductionsByStatus(String status) {
     return _productions.where((p) => p.status == status).toList();
   }
 
-  // Add method to get productions by date range
-  List<Production> getProductionsByDateRange(DateTime start, DateTime end) {
-    return _productions.where((p) => 
-      p.startDate.isAfter(start) && 
-      p.startDate.isBefore(end)
-    ).toList();
-  }
-
-  // Add method to get productions by team
-  List<Production> getProductionsByTeam(String team) {
-    return _productions.where((p) => p.assignedTeam == team).toList();
-  }
-
-  // Add method to check if production exists
-  bool productionExists(String productionId) {
-    return _productions.any((p) => p.id == productionId);
-  }
-
-  // Add method to update production step
-  Future<void> updateProductionStep(
-    String productionId, 
-    String stepName, 
-    bool isCompleted
-  ) async {
-    _setLoading(true);
-    _clearError();
-
+  Future<void> deleteProduction(String id) async {
     try {
-      final index = _productions.indexWhere((p) => p.id == productionId);
-      if (index != -1) {
-        final production = _productions[index];
-        final steps = List<ProductionStep>.from(production.steps ?? []);
-        
-        final stepIndex = steps.indexWhere((s) => s.name == stepName);
-        if (stepIndex != -1) {
-          steps[stepIndex] = ProductionStep(
-            name: stepName,
-            isCompleted: isCompleted,
-            completedAt: isCompleted ? DateTime.now() : null,
-          );
-
-          _productions[index] = production.copyWith(
-            steps: steps,
-            updatedAt: DateTime.now(),
-          );
-          
-          await _repository.updateProduction(_productions[index]);
-          notifyListeners();
-        }
-      }
+      _isLoading = true;
+      notifyListeners();
+      
+      await _repository.deleteProduction(id);
+      
+      // Remove the production from local state if you're maintaining a list
+      _productions.removeWhere((production) => production.id == id);
+      
+      _isLoading = false;
+      _error = null;
+      notifyListeners();
     } catch (e) {
-      _setError('Failed to update production step: ${e.toString()}');
-      rethrow;
-    } finally {
-      _setLoading(false);
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      throw Exception('Failed to delete production: $e');
     }
   }
 
-  // Add method to get production progress including steps
-  Map<String, dynamic> getProductionProgress(String productionId) {
-    final production = getProductionById(productionId);
-    if (production == null) return {};
-
-    final totalSteps = production.steps?.length ?? 0;
-    final completedSteps = production.steps?.where((s) => s.isCompleted).length ?? 0;
-    
-    return {
-      'quantityProgress': production.progressPercentage,
-      'stepsProgress': totalSteps > 0 ? (completedSteps / totalSteps) * 100 : 0,
-      'isCompleted': production.status == ProductionStatus.completed,
-      'completedQuantity': production.completedQuantity,
-      'targetQuantity': production.targetQuantity,
-      'completedSteps': completedSteps,
-      'totalSteps': totalSteps,
-    };
+  // Load product names
+  Future<void> loadProductNames() async {
+    try {
+      final names = await _repository.getDistinctProductNames();
+      _productNames = ['All Products', ...names];
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+    }
   }
 
-  // Helper methods
-  void _setLoading(bool loading) {
-    _isLoading = loading;
-    notifyListeners();
-  }
+  /// Fetches productions that are not currently in the queue
+  Future<List<Production>> getUnqueuedProductions() async {
+    try {
+      _isLoading = true;
+      notifyListeners();
 
-  void _setError(String error) {
-    _error = error;
-    notifyListeners();
-  }
+      // Get productions that are queued but not in the production_queue table
+      final List<Production> productions = await _repository.getUnqueuedProductions();
+      
+      _isLoading = false;
+      notifyListeners();
+      
+      return productions;
 
-  void _clearError() {
-    _error = null;
-  }
-
-  void clearError() {
-    _clearError();
-    notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      throw Exception('Failed to fetch unqueued productions: $e');
+    }
   }
 }

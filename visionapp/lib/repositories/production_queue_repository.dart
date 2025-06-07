@@ -24,14 +24,10 @@ class ProductionQueueRepository {
               target_quantity,
               completed_quantity,
               status,
-              start_date,
-              end_date,
               created_at,
               updated_at,
               order_id,
-              product_name,
-              expected_completion,
-              assigned_team
+              product_name  
             )
           ''')
           .order('queue_position', ascending: true);
@@ -165,6 +161,7 @@ class ProductionQueueRepository {
 
   Future<void> updateBatchStatus(String batchId, String status, double progress) async {
     try {
+
       await _supabaseService.client
           .from('production_batches')
           .update({
@@ -216,7 +213,7 @@ class ProductionQueueRepository {
       throw Exception('Failed to update production status: $e');
     }
   }
-
+  
   // Update the deleteAllQueueItems method
   Future<void> deleteAllQueueItems() async {
     try {

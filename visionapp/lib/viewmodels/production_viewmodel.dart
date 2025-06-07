@@ -144,4 +144,14 @@ class ProductionViewModel extends ChangeNotifier {
       throw Exception('Failed to fetch unqueued productions: $e');
     }
   }
+
+  Future<void> cleanupOrphanedProductions() async {
+    try {
+      await _repository.cleanupOrphanedProductions();
+      await loadProductions(); // Refresh list after cleanup
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+    }
+  }
 }

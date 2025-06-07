@@ -65,6 +65,33 @@ class ProductionRepository {
 
   Future<Production> createProduction(Production production) async {
     try {
+      // Check if production with same name and null order_id exists
+      final existingProduction = await _supabaseService.client
+          .from(_tableName)
+          .select()
+          .eq('product_name', production.productName)
+          .filter('order_id', 'is', null)  // Changed from is_('order_id', null)
+          .maybeSingle();
+
+      if (existingProduction != null) {
+        // Update existing production instead of creating new one
+        final response = await _supabaseService.client
+            .from(_tableName)
+            .update({
+              'target_quantity': production.targetQuantity,
+              'completed_quantity': production.completedQuantity,
+              'status': production.status,
+              'order_id': production.orderId,
+              'updated_at': DateTime.now().toIso8601String(),
+            })
+            .eq('id', existingProduction['id'])
+            .select()
+            .single();
+
+        return Production.fromJson(response);
+      }
+
+      // Create new production if no existing one found
       final response = await _supabaseService.client
           .from(_tableName)
           .insert({
@@ -166,6 +193,23 @@ class ProductionRepository {
     } catch (e) {
       print('Error in getUnqueuedProductions: $e'); // Add logging
       throw Exception('Failed to fetch unqueued productions: $e');
+    }
+  }
+
+  Future<void> cleanupOrphanedProductions() async {
+    try {
+      // Delete productions with null order_id that aren't in queue
+      await _supabaseService.client
+          .from(_tableName)
+          .delete()
+          .filter('order_id', 'is', null)  // Changed from is_('order_id', null)
+          .not('id', 'in', (
+            _supabaseService.client
+                .from('production_queue')
+                .select('production_id')
+          ));
+    } catch (e) {
+      throw Exception('Failed to cleanup orphaned productions: $e');
     }
   }
 }

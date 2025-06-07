@@ -259,14 +259,26 @@ class _ProductionQueueScreenState extends State<ProductionQueueScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Production Order',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF1F2937),
-                  letterSpacing: -0.3,
-                ),
+              Row(
+                children: [
+                  const Text(
+                    'Production Order',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1F2937),
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Add refresh button
+                  IconButton(
+                    onPressed: () => viewModel.loadQueue(),
+                    icon: const Icon(Icons.refresh),
+                    color: const Color(0xFF3B82F6),
+                    tooltip: 'Refresh Queue',
+                  ),
+                ],
               ),
               Row(
                 children: [
@@ -376,7 +388,7 @@ class _ProductionQueueScreenState extends State<ProductionQueueScreen> {
     );
   }
 
-Widget _buildQueueItem(
+  Widget _buildQueueItem(
     ProductionQueueItem item, 
     {required Key key, required ProductionQueueViewModel queueViewModel}
   ) {
@@ -412,49 +424,26 @@ Widget _buildQueueItem(
             padding: const EdgeInsets.all(12),
             child: Row(
               children: [
-                // Drag handle with better styling
-                Container(
-                  padding: const EdgeInsets.only(right: 12),
-                  child: Icon(
-                    Icons.drag_indicator,
-                    color: Colors.grey.shade400,
-                    size: 18,
-                  ),
-                ),
-                
-                // Compact checkbox with custom styling
-                Transform.scale(
-                  scale: 0.9,
-                  child: Checkbox(
-                    value: item.completed, // Change from isCompleted to completed
-                    onChanged: (bool? value) {
-                      _updateProductionStatus(
-                        item,
-                        value == true ? 'completed' : 'in progress',
-                        queueViewModel: queueViewModel,
-                      );
-                    },
-                    activeColor: const Color(0xFF10B981),
-                    checkColor: Colors.white,
-                    side: BorderSide(
-                      color: item.completed ? const Color(0xFF10B981) : Colors.grey.shade400,
-                      width: 1.5,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(4),
+                // Drag handle area
+                ReorderableDragStartListener(
+                  index: item.queuePosition - 1,
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    child: Icon(
+                      Icons.drag_indicator,
+                      color: Colors.grey.shade400,
+                      size: 24,
                     ),
                   ),
                 ),
                 
-                const SizedBox(width: 8),
-                
-                // Main content - more compact layout
+                // Main content
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Product name with completion styling
+                      // Product name
                       Text(
                         item.displayName,
                         style: TextStyle(
@@ -469,12 +458,30 @@ Widget _buildQueueItem(
                         ),
                       ),
                       
+                      const SizedBox(height: 4),
+                      
+                      // Status indicator
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: _getStatusColor(item.production.status).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          _getStatusText(item.production.status),
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: _getStatusColor(item.production.status),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      
                       const SizedBox(height: 6),
                       
-                      // Progress info in a single compact row
+                      // Progress row
                       Row(
                         children: [
-                          // Quantity text
                           Text(
                             '${item.quantity}/${item.production.targetQuantity}',
                             style: TextStyle(
@@ -486,7 +493,6 @@ Widget _buildQueueItem(
                           
                           const SizedBox(width: 8),
                           
-                          // Progress bar
                           Expanded(
                             child: Container(
                               height: 6,
@@ -511,7 +517,6 @@ Widget _buildQueueItem(
                           
                           const SizedBox(width: 8),
                           
-                          // Percentage badge
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
@@ -537,21 +542,26 @@ Widget _buildQueueItem(
                   ),
                 ),
                 
-                const SizedBox(width: 8),
-                
-                // Status indicator as a compact chip
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: _getStatusColor(item.production.status).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    _getStatusText(item.production.status),
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: _getStatusColor(item.production.status),
-                      fontWeight: FontWeight.w600,
+                // Checkbox moved to the right
+                Transform.scale(
+                  scale: 0.9,
+                  child: Checkbox(
+                    value: item.completed,
+                    onChanged: (bool? value) {
+                      _updateProductionStatus(
+                        item,
+                        value == true ? 'completed' : 'in progress',
+                        queueViewModel: queueViewModel,
+                      );
+                    },
+                    activeColor: const Color(0xFF10B981),
+                    checkColor: Colors.white,
+                    side: BorderSide(
+                      color: item.completed ? const Color(0xFF10B981) : Colors.grey.shade400,
+                      width: 1.5,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4),
                     ),
                   ),
                 ),

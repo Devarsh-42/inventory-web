@@ -19,7 +19,10 @@ class ProductionQueueRepository {
             quantity,
             created_at,
             updated_at,
-            production:productions!production_queue_production_id_fkey (
+            completed,
+            display_name,
+            status,
+            productions (
               id,
               target_quantity,
               completed_quantity,
@@ -27,7 +30,7 @@ class ProductionQueueRepository {
               created_at,
               updated_at,
               order_id,
-              product_name  
+              product_name
             )
           ''')
           .order('queue_position', ascending: true);
@@ -47,18 +50,19 @@ class ProductionQueueRepository {
           id: data['id'],
           productionId: data['production_id'],
           queuePosition: data['queue_position'],
-          quantity: data['quantity'] ?? 0, // Add quantity field
-          production: Production.fromJson(data['production']),
+          quantity: data['quantity'] ?? 0,
+          production: Production.fromJson(data['productions']), // Changed from 'production' to 'productions'
           batch: batchResponse != null ? ProductionBatch.fromJson(batchResponse) : null,
           createdAt: DateTime.parse(data['created_at']),
           updatedAt: DateTime.parse(data['updated_at']),
           completed: data['completed'] ?? false,
-          displayName: data['display_name'] ?? data['production']['product_name'], // Use display_name or fallback
+          displayName: data['display_name'] ?? data['productions']['product_name'], // Changed from 'production' to 'productions'
         );
       }));
 
       return queueItems;
     } catch (e) {
+      print('Error fetching production queue: $e'); // Add logging
       throw Exception('Failed to fetch production queue: $e');
     }
   }
@@ -199,17 +203,30 @@ class ProductionQueueRepository {
 
   Future<void> updateProductionStatus(String queueId, String productionId, String status, DateTime? endDate) async {
     try {
-      // Update only the specific queue item's completion status
-      await _supabaseService.client
-          .from('production_queue')
-          .update({
-            'completed': status == 'completed',
-            'status': status, // Add status to queue item
-            'updated_at': DateTime.now().toIso8601String()
-          })
-          .eq('id', queueId); // Use queue item ID to update specific item
+      // Update both queue item and production in a single batch request
+      await Future.wait([
+        // Update queue item
+        _supabaseService.client
+            .from('production_queue')
+            .update({
+              'completed': status == 'completed',
+              'status': status,
+              'updated_at': DateTime.now().toIso8601String()
+            })
+            .eq('id', queueId),
 
+        // Update production if status is completed
+        if (status == 'completed')
+          _supabaseService.client
+              .from('productions')
+              .update({
+                'status': status,
+                'updated_at': DateTime.now().toIso8601String()
+              })
+              .eq('id', productionId)
+      ]);
     } catch (e) {
+      print('Error updating production status: $e'); // Add logging
       throw Exception('Failed to update production status: $e');
     }
   }
@@ -217,7 +234,7 @@ class ProductionQueueRepository {
   // Update the deleteAllQueueItems method
   Future<void> deleteAllQueueItems() async {
     try {
-      // Call the stored procedure to handle deletion
+      // Use the stored procedure that handles deletion and cleanup
       await _supabaseService.client.rpc('clear_all_queue_data');
     } catch (e) {
       throw Exception('Failed to delete all queue items: $e');

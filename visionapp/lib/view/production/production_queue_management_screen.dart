@@ -63,7 +63,6 @@ class _ProductionQueueScreenState extends State<ProductionQueueScreen> {
             child: SafeArea(
               child: Column(
                 children: [
-                  _buildHeader(),
                   Expanded(
                     child: Container(
                       margin: const EdgeInsets.all(20),
@@ -94,23 +93,6 @@ class _ProductionQueueScreenState extends State<ProductionQueueScreen> {
       },
     );
   }
-
-  Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      child: const Text(
-        'Production Interface - Inventory Management',
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 24,
-          fontWeight: FontWeight.w700,
-          letterSpacing: -0.5,
-        ),
-        textAlign: TextAlign.center,
-      ),
-    );
-  }
-
   Widget _buildScreenHeader() {
     return Container(
       height: 70,
@@ -347,6 +329,12 @@ class _ProductionQueueScreenState extends State<ProductionQueueScreen> {
   }
 
   Widget _buildQueueList(ProductionQueueViewModel viewModel) {
+    if (viewModel.isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
     if (viewModel.queueItems.isEmpty) {
       return const Center(
         child: Column(
@@ -355,15 +343,23 @@ class _ProductionQueueScreenState extends State<ProductionQueueScreen> {
             Icon(
               Icons.queue_outlined,
               size: 64,
-              color: Colors.grey,
+              color: Color(0xFFCBD5E1),
             ),
             SizedBox(height: 16),
             Text(
               'No items in production queue',
               style: TextStyle(
                 fontSize: 16,
-                color: Colors.grey,
+                color: Color(0xFF64748B),
                 fontWeight: FontWeight.w500,
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Add items to get started',
+              style: TextStyle(
+                fontSize: 14,
+                color: Color(0xFF94A3B8),
               ),
             ),
           ],
@@ -660,7 +656,6 @@ class _ProductionQueueScreenState extends State<ProductionQueueScreen> {
         item.id,
         item.productionId,
         newStatus,
-        newStatus == 'completed' ? DateTime.now().toIso8601String() : null,
       );
       
       if (mounted) {

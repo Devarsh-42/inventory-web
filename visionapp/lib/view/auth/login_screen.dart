@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:visionapp/view/admin/admin_dashboard.dart';
 import 'package:visionapp/view/management/dashboard.dart';
+import 'package:visionapp/view/production/production_dashboard.dart';
 import 'package:visionapp/view/routes/app_routes.dart'; 
 import 'signup_screen.dart';
 
@@ -25,7 +27,56 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _login() async {
-    Navigator.push(context, MaterialPageRoute(builder: (context) => const ManagementDashboardScreen()));
+    if (_formKey.currentState!.validate()) {
+      final email = _companyIdController.text.trim();
+      final password = _passwordController.text.trim();
+
+      try {
+        // Sign in with Supabase
+        final response = await Supabase.instance.client.auth.signInWithPassword(
+          email: email,
+          password: password,
+        );
+
+        if (response.user != null) {
+          // Get user role from users table
+          final userData = await Supabase.instance.client
+              .from('users')
+              .select('role')
+              .eq('email', email)
+              .single();
+
+          if (!mounted) return;
+
+          // Handle navigation based on role
+          if (userData['role'] == 'admin') {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => AdminDashboard()),
+            );
+          } else if (userData['role'] == 'production') {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const ProductionDashboardScreen()),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Invalid user role')),
+            );
+          }
+        }
+      } on AuthException catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message)),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unexpected error occurred')),
+        );
+      }
+    }
   }
 
 

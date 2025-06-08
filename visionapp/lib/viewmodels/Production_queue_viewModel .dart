@@ -3,15 +3,25 @@ import 'package:flutter/foundation.dart';
 import 'package:visionapp/models/Production_batch_model.dart';
 import '../models/production.dart';
 import '../repositories/production_queue_repository.dart';
+import '../repositories/orders_repository.dart';
+import '../repositories/dispatch_repository.dart';
+import '../core//services/supabase_services.dart';
 
 class ProductionQueueViewModel extends ChangeNotifier {
   final ProductionQueueRepository _repository;
+  final OrdersRepository _ordersRepository;
+  final DispatchRepository _dispatchRepository;
   bool _isLoading = false;
   String? _error;
   List<ProductionQueueItem> _queueItems = [];
 
-  ProductionQueueViewModel({ProductionQueueRepository? repository})
-      : _repository = repository ?? ProductionQueueRepository();
+  ProductionQueueViewModel({
+    ProductionQueueRepository? repository,
+    OrdersRepository? ordersRepository,
+    DispatchRepository? dispatchRepository,
+  }) : _repository = repository ?? ProductionQueueRepository(),
+       _ordersRepository = ordersRepository ?? OrdersRepository(),
+       _dispatchRepository = dispatchRepository ?? DispatchRepository();
 
   // Getters
   bool get isLoading => _isLoading;
@@ -37,39 +47,35 @@ class ProductionQueueViewModel extends ChangeNotifier {
       rethrow;
     }
   }
-
   // Reorder queue items
   void reorderQueue(int oldIndex, int newIndex) async {
     try {
+      // Handle index adjustment for reordering
       if (oldIndex < newIndex) {
         newIndex -= 1;
       }
       
-      final item = _queueItems.removeAt(oldIndex);
-      _queueItems.insert(newIndex, item);
+      // Create a copy of the current queue state
+      final List<ProductionQueueItem> originalItems = List<ProductionQueueItem>.from(_queueItems);
       
-      // Update positions
-      final updatedItems = List<ProductionQueueItem>.from(_queueItems);
-      for (var i = 0; i < updatedItems.length; i++) {
-        updatedItems[i] = ProductionQueueItem(
-          id: updatedItems[i].id,
-          productionId: updatedItems[i].productionId,
-          queuePosition: i + 1,
-          quantity: updatedItems[i].quantity,
-          production: updatedItems[i].production,
-          batch: updatedItems[i].batch,
-          createdAt: updatedItems[i].createdAt,
-          updatedAt: updatedItems[i].updatedAt,
-          displayName: updatedItems[i].displayName,
-        );
+      try {
+        // Update local state
+        final item = _queueItems.removeAt(oldIndex);
+        _queueItems.insert(newIndex, item);
+        notifyListeners();
+        
+        // Get the list of IDs in the new order
+        final orderedIds = _queueItems.map((item) => item.id).toList();
+        
+        // Save new order
+        await _repository.updateQueueOrder(orderedIds);
+      } catch (e) {
+        // Revert to original order on error
+        _queueItems = originalItems;
+        _error = e.toString();
+        notifyListeners();
+        rethrow;
       }
-      
-      // Save new order first
-      await _repository.saveQueueOrder(updatedItems);
-      
-      // Then update local state
-      _queueItems = updatedItems;
-      notifyListeners();
     } catch (e) {
       _error = e.toString();
       notifyListeners();
@@ -80,9 +86,9 @@ class ProductionQueueViewModel extends ChangeNotifier {
   // Save queue order
   Future<void> _saveQueueOrder() async {
     try {
-      for (var i = 0; i < _queueItems.length; i++) {
-        await _repository.updateQueueOrder([_queueItems[i].id]);
-      }
+      final orderedIds = _queueItems.map((item) => item.id).toList();
+      await _repository.updateQueueOrder(orderedIds);
+      await loadQueue(); // Reload to ensure we have the correct order
     } catch (e) {
       _error = e.toString();
       rethrow;
@@ -124,25 +130,112 @@ class ProductionQueueViewModel extends ChangeNotifier {
     loadQueue();
   }
 
+  final _supabaseService = SupabaseService.instance;
+
+  // Update the markAsCompleted method to use the new schema
   Future<void> markAsCompleted(String queueId, String productionId) async {
+    try {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      // Get production details before completing
+      final production = await _repository.getProductionById(productionId);
+      if (production == null) {
+        throw Exception('Production not found');
+      }
+
+      // Get queue item to get quantity
+      final queueItem = _queueItems.firstWhere(
+        (item) => item.id == queueId,
+        orElse: () => throw Exception('Queue item not found'),
+      );
+
+      // Start transaction
+      await _supabaseService.client.rpc('begin_transaction');
+
+      try {
+        // 1. Create production completion record
+        final completionResponse = await _supabaseService.client
+            .from('production_completions')
+            .insert({
+              'production_id': productionId,
+              'product_name': production.productName,
+              'quantity_completed': queueItem.quantity,
+              'order_id': production.orderId,
+              'completed_on': DateTime.now().toIso8601String(),
+              'notes': 'Completed from production queue',
+            })
+            .select()
+            .single();
+
+        // 2. Update queue item status
+        await _supabaseService.client
+            .from('production_queue')
+            .update({
+              'status': 'completed',
+              'completed': true,
+              'updated_at': DateTime.now().toIso8601String(),
+            })
+            .eq('id', queueId);
+
+        // 3. Update production completed quantity
+        await _supabaseService.client
+            .from('productions')
+            .update({
+              'completed_quantity': production.completedQuantity + queueItem.quantity,
+              'updated_at': DateTime.now().toIso8601String(),
+            })
+            .eq('id', productionId);
+
+        // Commit transaction
+        await _supabaseService.client.rpc('commit_transaction');
+
+        // The create_dispatch_entry trigger will automatically handle:
+        // - Creating/updating dispatch record
+        // - Creating dispatch items
+        // - Linking completion to dispatch items
+
+        // Reload queue to show updated status
+        await loadQueue();
+
+        _isLoading = false;
+        notifyListeners();
+      } catch (e) {
+        // Rollback on any error
+        await _supabaseService.client.rpc('rollback_transaction');
+        throw Exception('Failed to complete production: $e');
+      }
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      throw Exception('Failed to mark as completed: $e');
+    }
+  }
+
+  // Add method to handle checking dispatch status
+  Future<bool> checkDispatchStatus(String dispatchId) async {
+    try {
+      return await _dispatchRepository.checkAllItemsReady(dispatchId);
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // Add method to cleanup completed productions
+  Future<void> cleanupCompletedProductions() async {
     try {
       _isLoading = true;
       notifyListeners();
 
-      // Update production status
-      await _repository.updateProductionStatus(
-        queueId,
-        productionId, 
-        'completed',
-        DateTime.now().toIso8601String() as DateTime?,
-      );
-
-      // Remove from queue
-      await _repository.removeFromQueue(queueId);
-
-      // Reload queue
+      await _repository.processCompletedItems();
       await loadQueue();
 
+      _isLoading = false;
+      notifyListeners();
     } catch (e) {
       _error = e.toString();
       _isLoading = false;
@@ -151,24 +244,22 @@ class ProductionQueueViewModel extends ChangeNotifier {
     }
   }
 
-  // Update production status
+  // Update production status method
   Future<void> updateProductionStatus(
     String queueId, 
     String productionId, 
-    String status, 
-    String? endDateString
+    String status
   ) async {
     try {
       _isLoading = true;
       _error = null;
       notifyListeners();
 
-      DateTime? endDate;
-      if (endDateString != null && endDateString.isNotEmpty) {
-        endDate = DateTime.parse(endDateString);
-      }
-
-      await _repository.updateProductionStatus(queueId, productionId, status, endDate);
+      await _repository.updateProductionStatus(
+        queueId, 
+        productionId, 
+        status
+      );
 
       if (status == 'completed') {
         await _moveCompletedToBottom();
@@ -185,35 +276,24 @@ class ProductionQueueViewModel extends ChangeNotifier {
     }
   }
 
-  // New method to move completed items to bottom
+  // Update _moveCompletedToBottom to handle completed items better
   Future<void> _moveCompletedToBottom() async {
     try {
-      final activeItems = _queueItems.where((item) => !item.isCompleted).toList();
-      final completedItems = _queueItems.where((item) => item.isCompleted).toList();
+      final activeItems = _queueItems
+          .where((item) => item.status != 'completed')
+          .toList();
+      final completedItems = _queueItems
+          .where((item) => item.status == 'completed')
+          .toList();
       
-      // Combine lists with completed items at bottom
-      final newOrder = [...activeItems, ...completedItems];
+      // Combine lists with completed items at bottom and get their IDs
+      final orderedIds = [...activeItems, ...completedItems].map((item) => item.id).toList();
       
-      // Update positions
-      for (var i = 0; i < newOrder.length; i++) {
-        newOrder[i] = ProductionQueueItem(
-          id: newOrder[i].id,
-          productionId: newOrder[i].productionId,
-          queuePosition: i + 1,
-          quantity: newOrder[i].quantity,
-          production: newOrder[i].production,
-          batch: newOrder[i].batch,
-          createdAt: newOrder[i].createdAt,
-          updatedAt: newOrder[i].updatedAt,
-          displayName: newOrder[i].displayName,
-        );
-      }
+      // Save new order using updateQueueOrder
+      await _repository.updateQueueOrder(orderedIds);
       
-      // Save new order
-      await _repository.saveQueueOrder(newOrder);
-      
-      _queueItems = newOrder;
-      notifyListeners();
+      // Reload queue to get updated data
+      await loadQueue();
     } catch (e) {
       _error = e.toString();
       rethrow;
@@ -276,16 +356,16 @@ class ProductionQueueViewModel extends ChangeNotifier {
     try {
       _isLoading = true;
       notifyListeners();
-
-      await _repository.deleteAllQueueItems();
-      _queueItems = []; // Clear the local list
       
+      await _repository.deleteAllQueueItems();
+      _queueItems = []; // Clear local items immediately
+      
+      _isLoading = false;
       notifyListeners();
     } catch (e) {
       _error = e.toString();
       _isLoading = false;
       notifyListeners();
-      rethrow;
     }
   }
 

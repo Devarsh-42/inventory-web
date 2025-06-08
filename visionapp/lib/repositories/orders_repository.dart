@@ -189,4 +189,21 @@ class OrdersRepository {
       throw Exception('Failed to update order: $e');
     }
   }
+
+  Future<Order> getOrderById(String orderId) async {
+    try {
+      final response = await _supabaseService.client
+          .from(_tableName)
+          .select('''
+            *,
+            products:$_productsTable(*)
+          ''')
+          .eq('id', orderId)
+          .single();
+
+      return Order.fromJson(response);
+    } catch (e) {
+      throw Exception('Failed to fetch order by ID: $e');
+    }
+  }
 }

@@ -1,7 +1,9 @@
 // repositories/production_queue_repository.dart
 import 'package:visionapp/models/Production_batch_model.dart';
+import 'package:visionapp/models/production_completion.dart';
 import '../core/services/supabase_services.dart';
 import '../models/production.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestFilterBuilder;
 
 class ProductionQueueRepository {
   final SupabaseService _supabaseService;
@@ -65,73 +67,109 @@ class ProductionQueueRepository {
       print('Error fetching production queue: $e'); // Add logging
       throw Exception('Failed to fetch production queue: $e');
     }
+  }  Future<void> updateQueueOrder(List<String> queueIds) async {
+  try {
+    await _supabaseService.client.rpc(
+      'batch_update_queue_positions',
+      params: {
+        'item_ids': queueIds,
+      },
+    );
+    
+    // Small delay to allow the database to process the changes
+    await Future.delayed(const Duration(milliseconds: 100));
+  } catch (e) {
+    print('Error updating queue order: $e');
+    throw Exception('Failed to update queue order: $e');
   }
-
-  Future<void> updateQueueOrder(List<String> queueIds) async {
-    try {
-      // Update queue positions in batch
-      for (int i = 0; i < queueIds.length; i++) {
-        await _supabaseService.client
-            .from('production_queue')
-            .update({'queue_position': i + 1})
-            .eq('id', queueIds[i]);
-      }
-    } catch (e) {
-      throw Exception('Failed to update queue order: $e');
-    }
-  }
+}
 
   Future<void> addToQueue(String productionId, int quantity) async {
     try {
-      // Get the production details first
-      final productionResponse = await _supabaseService.client
+      // Get current user ID
+      final userId = _supabaseService.client.auth.currentUser?.id;
+      if (userId == null) {
+        throw Exception('User not authenticated');
+      }
+
+      // Get production details with proper join
+      final production = await _supabaseService.client
           .from('productions')
-          .select('product_name')
+          .select('''
+            *,
+            orders!inner (
+              id,
+              order_products (
+                id,
+                name,
+                quantity,
+                completed
+              )
+            )
+          ''')
           .eq('id', productionId)
           .single();
 
-      final baseProductName = productionResponse['product_name'];
+      // Calculate already queued quantity
+      final queuedResponse = await _supabaseService.client
+          .from('production_queue')
+          .select('quantity')
+          .eq('production_id', productionId);
+    
+      final queuedQuantity = (queuedResponse as List)
+          .fold(0, (sum, item) => sum + (item['quantity'] as int? ?? 0));
 
-      // Get existing queue items for this production to determine sequence number
+      // Get target quantity from matching order product using correct column name 'name'
+      final orderProducts = production['orders']['order_products'] as List;
+      final targetProduct = orderProducts.firstWhere(
+        (product) => product['name'] == production['product_name'],
+        orElse: () => throw Exception('Product not found in order'),
+      );
+
+      final targetQuantity = targetProduct['quantity'] as int;
+      final availableQuantity = targetQuantity - queuedQuantity;
+
+      if (quantity > availableQuantity) {
+        throw Exception('Requested quantity ($quantity) exceeds available quantity ($availableQuantity)');
+      }
+
+      // Generate display name
       final existingItems = await _supabaseService.client
           .from('production_queue')
           .select('display_name')
-          .eq('production_id', productionId)
-          .order('created_at', ascending: true);
+          .ilike('display_name', '${production['product_name']}%');
 
-      // Calculate next sequence number
-      final sequenceNumber = (existingItems as List).length + 1;
+      String displayName = production['product_name'];
+      if (existingItems.isNotEmpty) {
+        displayName = '${production['product_name']} #${existingItems.length + 1}';
+      }
 
-      // Create display name with sequence number
-      final displayName = sequenceNumber > 1 
-          ? '$baseProductName #$sequenceNumber' 
-          : baseProductName;
-
-      // Get the next queue position
-      final maxPositionResponse = await _supabaseService.client
+      // Get next queue position
+      final positionResponse = await _supabaseService.client
           .from('production_queue')
           .select('queue_position')
           .order('queue_position', ascending: false)
-          .limit(1);
+          .limit(1)
+          .maybeSingle();
 
-      int newPosition = 1;
-      if (maxPositionResponse.isNotEmpty) {
-        newPosition = (maxPositionResponse.first['queue_position'] as int) + 1;
-      }
+      final newPosition = (positionResponse?['queue_position'] as int?) ?? 0;
 
-      // Insert new queue item with display name
+      // Insert new queue item
       await _supabaseService.client
           .from('production_queue')
           .insert({
             'production_id': productionId,
-            'queue_position': newPosition,
+            'queue_position': newPosition + 1,
             'quantity': quantity,
             'display_name': displayName,
+            'status': 'pending',
             'completed': false,
-            'status': 'pending'
+            'created_by': userId
           });
+
     } catch (e) {
-      throw Exception('Failed to add to queue: $e');
+      print('Error adding to queue: $e');
+      throw Exception('Failed to add item to queue: $e');
     }
   }
 
@@ -165,7 +203,6 @@ class ProductionQueueRepository {
 
   Future<void> updateBatchStatus(String batchId, String status, double progress) async {
     try {
-
       await _supabaseService.client
           .from('production_batches')
           .update({
@@ -179,54 +216,51 @@ class ProductionQueueRepository {
     }
   }
 
-  Future<void> saveQueueOrder(List<ProductionQueueItem> items) async {
+  Future<void> updateProductionStatus(String queueId, String productionId, String status) async {
     try {
-      // First reset all positions to temporary values to avoid conflicts
-      for (var i = 0; i < items.length; i++) {
-        await _supabaseService.client
-            .from('production_queue')
-            .update({'queue_position': -1 - i})
-            .eq('id', items[i].id);
+      // Get queue item and production details first using a simpler query
+      final response = await _supabaseService.client
+          .from('production_queue')
+          .select('*, productions:production_id(*)')
+          .eq('id', queueId)
+          .maybeSingle();
+
+      if (response == null) {
+        throw Exception('Queue item not found');
       }
 
-      // Then update to final positions
-      for (var i = 0; i < items.length; i++) {
-        await _supabaseService.client
-            .from('production_queue')
-            .update({'queue_position': i + 1})
-            .eq('id', items[i].id);
-      }
-    } catch (e) {
-      throw Exception('Failed to save queue order: $e');
-    }
-  }
+      final queueItem = response;
+      final production = queueItem['productions'];
+      final quantity = queueItem['quantity'] ?? 0;
+      final newCompletedQuantity = (production['completed_quantity'] as int) + quantity;
 
-  Future<void> updateProductionStatus(String queueId, String productionId, String status, DateTime? endDate) async {
-    try {
-      // Update both queue item and production in a single batch request
-      await Future.wait([
-        // Update queue item
-        _supabaseService.client
-            .from('production_queue')
+      if (status == 'completed') {
+        // First update the production status
+        await _supabaseService.client
+            .from('productions')
             .update({
-              'completed': status == 'completed',
               'status': status,
+              'completed_quantity': newCompletedQuantity,
               'updated_at': DateTime.now().toIso8601String()
             })
-            .eq('id', queueId),
+            .eq('id', productionId);
 
-        // Update production if status is completed
-        if (status == 'completed')
-          _supabaseService.client
+        // Then update the queue item
+        await updateQueueItemStatus(queueId, status);
+
+        // Handle completion logic
+        if (newCompletedQuantity >= production['target_quantity']) {
+          await _supabaseService.client
               .from('productions')
-              .update({
-                'status': status,
-                'updated_at': DateTime.now().toIso8601String()
-              })
-              .eq('id', productionId)
-      ]);
+              .update({'status': 'completed'})
+              .eq('id', productionId);
+        }
+      } else {
+        // For non-completed status, just update the queue item status
+        await updateQueueItemStatus(queueId, status);
+      }
     } catch (e) {
-      print('Error updating production status: $e'); // Add logging
+      print('Error updating production status: $e');
       throw Exception('Failed to update production status: $e');
     }
   }
@@ -238,6 +272,170 @@ class ProductionQueueRepository {
       await _supabaseService.client.rpc('clear_all_queue_data');
     } catch (e) {
       throw Exception('Failed to delete all queue items: $e');
+    }
+  }
+
+  Future<Production?> getProductionById(String productionId) async {
+    try {
+      final response = await _supabaseService.client
+          .from('productions')
+          .select()
+          .eq('id', productionId)
+          .single();
+      
+      if (response == null) return null;
+      return Production.fromJson(response);
+    } catch (e) {
+      throw Exception('Failed to get production by ID: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> createCompletedProduction({
+    required String orderId,
+    required String productName,
+    required String productionId,
+    required int quantityCompleted,
+  }) async {
+    try {
+      final completion = ProductionCompletion(
+        productionId: productionId,
+        orderId: orderId,
+        productName: productName,
+        quantityCompleted: quantityCompleted,
+        completedOn: DateTime.now(),
+      );
+
+      final response = await _supabaseService.client
+          .from('production_completions')
+          .insert(completion.toJson())
+          .select()
+          .single();
+
+      if (response == null) {
+        throw Exception('Failed to create production completion');
+      }
+
+      // Create dispatch entry using the completion ID
+      await _supabaseService.markCompletion(response['id']);
+
+      return response;
+    } catch (e) {
+      print('Error creating production completion: $e');
+      throw Exception('Failed to create production completion: $e');
+    }
+  }
+
+  Future<void> updateProduction(String productionId, Map<String, dynamic> updates) async {
+    try {
+      await _supabaseService.client
+          .from('productions')
+          .update(updates)
+          .eq('id', productionId);
+    } catch (e) {
+      throw Exception('Failed to update production: $e');
+    }
+  }
+
+  Future<void> markItemAsCompleted(String queueId, String productionId) async {
+    try {
+      await _supabaseService.client.rpc('begin_transaction');
+
+      try {
+        final queueItem = await _supabaseService.client
+            .from('production_queue')
+            .select('''
+              *,
+              productions!inner (
+                id,
+                product_name,
+                order_id,
+                target_quantity,
+                completed_quantity,
+                status
+              )
+            ''')
+            .eq('id', queueId)
+            .single();
+
+        // Update queue item status - this will trigger the completion creation
+        await _supabaseService.client
+            .from('production_queue')
+            .update({
+              'status': 'completed',
+              'completed': true,
+            })
+            .eq('id', queueId);
+
+        // Update production completed quantity
+        final totalCompleted = (queueItem['productions']['completed_quantity'] ?? 0) + 
+                             queueItem['quantity'];
+
+        await _supabaseService.client
+            .from('productions')
+            .update({
+              'completed_quantity': totalCompleted,
+              'status': totalCompleted >= queueItem['productions']['target_quantity'] 
+                  ? 'completed' 
+                  : 'in progress',
+            })
+            .eq('id', productionId);
+
+        await _supabaseService.client.rpc('commit_transaction');
+
+      } catch (e) {
+        await _supabaseService.client.rpc('rollback_transaction');
+        throw e;
+      }
+    } catch (e) {
+      print('Error marking item as completed: $e');
+      throw Exception('Failed to mark item as completed: $e');
+    }
+  }
+
+  // Helper method to validate queue status
+  bool _isValidQueueStatus(String status) {
+    return ['pending', 'in progress', 'completed', 'paused'].contains(status);
+  }
+
+  // Update queue item status with validation
+  Future<void> updateQueueItemStatus(String queueId, String status) async {
+    if (!_isValidQueueStatus(status)) {
+      throw Exception('Invalid queue status: $status');
+    }
+
+    try {
+      await _supabaseService.client
+          .from('production_queue')
+          .update({
+            'status': status,
+            'completed': status == 'completed',
+          })
+          .eq('id', queueId);
+    } catch (e) {
+      throw Exception('Failed to update queue item status: $e');
+    }
+  }
+
+  Future<void> processCompletedItems() async {
+    try {
+      await _supabaseService.client.rpc('begin_transaction');
+
+      // Insert completed productions
+      final completedProds = await _supabaseService.client
+          .rpc('process_completed_productions');
+
+      // Create dispatch entries
+      final dispatchEntries = await _supabaseService.client
+          .rpc('create_dispatch_entries');
+
+      // Create dispatch items
+      await _supabaseService.client
+          .rpc('create_dispatch_items');
+
+      await _supabaseService.client.rpc('commit_transaction');
+    } catch (e) {
+      await _supabaseService.client.rpc('rollback_transaction');
+      throw Exception('Failed to process completed items: $e');
     }
   }
 }

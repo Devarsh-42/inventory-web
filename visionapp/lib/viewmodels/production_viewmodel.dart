@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:visionapp/repositories/production_completion_repository.dart';
 import '../models/production.dart';
 import '../repositories/production_repository.dart';
 
@@ -10,7 +11,7 @@ class ProductionViewModel extends ChangeNotifier {
   Map<String, dynamic> _stats = {};
   List<String> _productNames = ['All Products'];
 
-  ProductionViewModel({ProductionRepository? repository})
+  ProductionViewModel({ProductionRepository? repository, required ProductionCompletionRepository completionRepository})
       : _repository = repository ?? ProductionRepository();
 
   // Getters

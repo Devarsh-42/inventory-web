@@ -1,10 +1,12 @@
 // lib/views/admin/admin_dashboard.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:visionapp/core/services/supabase_services.dart';
 import 'package:visionapp/core/utils/responsive_helper.dart';
 import 'package:visionapp/view/admin/order_details_screen.dart';
 import 'package:visionapp/view/admin/production_management_screen.dart';
 import 'package:visionapp/view/admin/performance_management_admin_screen.dart' as production;
+import 'package:visionapp/view/auth/login_screen.dart';
 import 'package:visionapp/view/management/AddNewOrders_Screen.dart';
 import 'package:visionapp/view/production/production_dashboard.dart';
 import '../../viewmodels/orders_viewmodel.dart';
@@ -135,15 +137,70 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Widget _buildHeader() {
     final isMobile = ResponsiveHelper.isMobile(context);
     
-    return Text(
-      AppStrings.dashboardTitle_admin,
-      style: TextStyle(
-        color: Colors.white,
-        fontSize: isMobile ? 24 : 28,
-        fontWeight: FontWeight.bold,
-        letterSpacing: -0.5,
-      ),
-      textAlign: TextAlign.center,
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          AppStrings.dashboardTitle_admin,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: isMobile ? 24 : 28,
+            fontWeight: FontWeight.bold,
+            letterSpacing: -0.5,
+          ),
+        ),
+        IconButton(
+          icon: const Icon(
+            Icons.logout,
+            color: Colors.white,
+          ),
+          onPressed: () => _showLogoutDialog(),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _showLogoutDialog() async {
+    return showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Logout'),
+          content: const Text('Are you sure you want to logout?'),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          actions: [
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            TextButton(
+              child: const Text(
+                'Logout',
+                style: TextStyle(color: Colors.red),
+              ),
+              onPressed: () async {
+                try {
+                  await SupabaseService.instance.signOut();
+                  if (mounted) {
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (context) => const LoginScreen()),
+                      (route) => false,
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to logout: $e')),
+                    );
+                  }
+                }
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 

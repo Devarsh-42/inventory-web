@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:visionapp/core/services/supabase_services.dart';
+import 'package:visionapp/view/auth/login_screen.dart';
 import 'package:visionapp/view/production/add_product_screen.dart';
 import 'package:visionapp/view/production/production_details_screen.dart';
 import 'package:visionapp/view/production/production_management_screen.dart';
 import 'package:visionapp/view/production/production_queue_management_screen.dart';
+import 'package:visionapp/view/production/ready_to_ship_screen.dart';
+import 'package:visionapp/view/production/dispatch_screen.dart'; // Import DispatchScreen
+import 'package:visionapp/viewmodels/completed_production_viewmodel.dart';
 import '../../viewmodels/production_viewmodel.dart';
+import '../../viewmodels/dispatch_viewmodel.dart';
+import '../../repositories/dispatch_repository.dart';
 import '../../models/production.dart';
 
 class ProductionDashboardScreen extends StatefulWidget {
@@ -32,6 +39,19 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF1E40AF),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(
+              Icons.logout,
+              color: Colors.white,
+            ),
+            onPressed: () => _showLogoutDialog(),
+          ),
+        ],
+      ),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -158,18 +178,6 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
           ),
         ),
       ),
-      floatingActionButton: Container(
-        margin: const EdgeInsets.only(bottom: 80),
-        child: FloatingActionButton(
-          onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const AddProductScreen(),
-                ),
-              ),
-          backgroundColor: const Color(0xFF1E40AF),
-          child: const Icon(Icons.add , color: Colors.white),
-        ),
-      ),
     );
   }
 
@@ -227,6 +235,20 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
     );
   }
 
+  void _handleReadyToShipNavigation() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChangeNotifierProvider(
+          create: (_) => DispatchViewModel(
+            repository: DispatchRepository(),
+          ),
+          child: const ReadyToShipScreen(),
+        ),
+      ),
+    );
+  }
+
   Widget _buildStatsGrid(ProductionViewModel viewModel) {
     final stats = viewModel.stats;
     final inProgressCount = viewModel.getProductionsByStatus('in-progress').length;
@@ -279,45 +301,48 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
         ),
         const SizedBox(width: 14),
         Expanded(
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF1E40AF), Color(0xFF3B82F6)],
+          child: GestureDetector(
+            onTap: _handleReadyToShipNavigation,  // Updated to use the new method
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF1E40AF), Color(0xFF3B82F6)],
+                ),
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF1E40AF).withOpacity(0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
               ),
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF1E40AF).withOpacity(0.2),
-                  blurRadius: 8,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                Text(
-                  '$completedCount',
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    letterSpacing: -0.5,
+              child: Column(
+                children: [
+                  Text(
+                    '$completedCount',
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      letterSpacing: -0.5,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'READY TO SHIP',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                    letterSpacing: 0.5,
+                  const SizedBox(height: 4),
+                  const Text(
+                    'READY TO SHIP',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                      letterSpacing: 0.5,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -658,7 +683,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
   }
 
   void _handleNavigation(String label) {
-    if (label == 'Dashboard') return; // Already on dashboard
+    if (label == 'Dashboard') return;
 
     Widget screen;
     switch (label) {
@@ -669,7 +694,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
         screen = const ProductionQueueScreen();
         break;
       case 'Orders':
-        screen = const ProductsScreen();
+        screen = const DispatchScreen(); // Updated to use DispatchScreen
         break;
       case 'Alerts':
         screen = const ProductsScreen();
@@ -683,6 +708,47 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
       MaterialPageRoute(
         builder: (context) => screen,
       ),
+    );
+  }
+
+  Future<void> _showLogoutDialog() async {
+    return showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Logout'),
+          content: const Text('Are you sure you want to logout?'),
+          actions: [
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            TextButton(
+              child: const Text(
+                'Logout',
+                style: TextStyle(color: Colors.red),
+              ),
+              onPressed: () async {
+                try {
+                  await SupabaseService.instance.signOut();
+                  if (mounted) {
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (context) => const LoginScreen()),
+                      (route) => false,
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to logout: $e')),
+                    );
+                  }
+                }
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 

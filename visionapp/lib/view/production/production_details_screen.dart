@@ -4,6 +4,7 @@ import '../../models/production.dart';
 import '../../viewmodels/production_viewmodel.dart';
 import '../../core/utils/responsive_helper.dart';
 import '../../pallet.dart';
+import 'production_bottom_nav.dart';
 
 class ProductDetailsScreen extends StatefulWidget {
   final Production production;
@@ -64,6 +65,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
           ),
         ),
       ),
+      bottomNavigationBar: const ProductionBottomNav(currentRoute: '/products'),
     );
   }
 

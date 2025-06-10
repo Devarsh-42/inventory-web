@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:visionapp/repositories/product_repository.dart';
+import 'package:visionapp/repositories/production_completion_repository.dart';
+import 'package:visionapp/viewmodels/production_viewmodel.dart';
+import 'package:visionapp/repositories/production_repository.dart';
 import '../../pallet.dart';
-import '../../core/utils/responsive_helper.dart';
+import '../../core/utils/responsive_helper.dart';// Adjust the import based on your project structure
 
 class ProductionManagementScreen extends StatefulWidget {
   const ProductionManagementScreen({Key? key}) : super(key: key);
@@ -10,6 +14,23 @@ class ProductionManagementScreen extends StatefulWidget {
 }
 
 class _ProductionManagementScreenState extends State<ProductionManagementScreen> {
+  late ProductionViewModel _viewModel;
+
+  @override
+  void initState() {
+    super.initState();
+    _viewModel = ProductionViewModel(
+      repository: ProductionRepository(),
+      completionRepository: ProductionCompletionRepository(),
+    );
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    await _viewModel.loadProductions();
+    await _viewModel.getSystemAlerts();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -33,112 +54,100 @@ class _ProductionManagementScreenState extends State<ProductionManagementScreen>
             },
           ),
           IconButton(
-            icon: const Icon(Icons.notifications_outlined, color: Palette.inverseTextColor),
-            onPressed: () {
-              // Show notifications
-            },
+            icon: const Icon(Icons.refresh, color: Palette.inverseTextColor),
+            onPressed: _loadData,
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Alert Cards
-            _buildAlertCard(
-              title: '⚠️ Maintenance Alert',
-              description: 'Machine #3 scheduled for maintenance in 2 hours',
-              color: Palette.pausedColor,
-            ),
-            const SizedBox(height: 12),
-            _buildAlertCard(
-              title: '📦 Inventory Alert',
-              description: 'Product Alpha materials below minimum level (45 units left)',
-              color: Palette.urgentColor,
-            ),
-            const SizedBox(height: 24),
+      body: RefreshIndicator(
+        onRefresh: _loadData,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // System Alerts
+              if (_viewModel.stats['alerts']?.isNotEmpty ?? false)
+                ..._buildAlertCards(_viewModel.stats['alerts']),
+              const SizedBox(height: 24),
 
-            // Performance Stats Grid
-            _buildStatsGrid(),
-            const SizedBox(height: 24),
+              // Performance Stats Grid
+              _buildStatsGrid(_viewModel.stats),
+              const SizedBox(height: 24),
 
-            // Live Production Status
-            _buildSectionTitle('Live Production Status'),
-            const SizedBox(height: 16),
-            _buildProductionItem(
-              orderNumber: 'Order #1082 - Acme Corp',
-              product: 'Product Alpha',
-              machine: 'Machine #1',
-              startTime: '09:30',
-              progress: 0.75,
-              completed: 1500,
-              total: 2000,
-              status: ProductionStatus.running,
-            ),
-            const SizedBox(height: 12),
-            _buildProductionItem(
-              orderNumber: 'Order #1081 - TechFlow',
-              product: 'Product Beta',
-              machine: 'Machine #2',
-              startTime: '11:15',
-              progress: 0.30,
-              completed: 300,
-              total: 1000,
-              status: ProductionStatus.paused,
-            ),
-            const SizedBox(height: 12),
-            _buildProductionItem(
-              orderNumber: 'Order #1080 - Global Inc',
-              product: 'Product Gamma',
-              machine: 'Machine #3',
-              startTime: '10:45',
-              progress: 1.0,
-              completed: 500,
-              total: 500,
-              status: ProductionStatus.completed,
-            ),
-            const SizedBox(height: 24),
-
-            // Team Performance
-            _buildSectionTitle('Team Performance'),
-            const SizedBox(height: 16),
-            _buildTeamPerformanceCard(
-              teamName: 'Production Team A',
-              target: 2000,
-              achieved: 2150,
-              isTargetMet: true,
-            ),
-            const SizedBox(height: 12),
-            _buildTeamPerformanceCard(
-              teamName: 'Production Team B',
-              target: 1500,
-              achieved: 1275,
-              isTargetMet: false,
-            ),
-            const SizedBox(height: 24),
-
-            // Action Buttons
-            _buildActionButton(
-              'View Detailed Reports',
-              Icons.analytics_outlined,
-              () {
-                // Navigate to detailed reports
-              },
-            ),
-            const SizedBox(height: 12),
-            _buildActionButton(
-              'Send SMS Updates',
-              Icons.sms_outlined,
-              () {
-                // Send SMS updates
-              },
-              color: Palette.inProductionColor,
-            ),
-          ],
+              // Live Production Status
+              _buildSectionTitle('Live Production Status'),
+              const SizedBox(height: 16),
+              _buildLiveProductionList(),
+            ],
+          ),
         ),
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          // Show dialog to create new production
+        },
+        child: const Icon(Icons.add),
+        backgroundColor: Palette.primaryBlue,
+      ),
     );
+  }
+
+  List<Widget> _buildAlertCards(List<dynamic> alerts) {
+    return alerts.map((alert) => _buildAlertCard(
+      title: alert['title'],
+      description: alert['description'],
+      color: _getAlertColor(alert['type']),
+    )).toList();
+  }
+
+  Widget _buildLiveProductionList() {
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: _viewModel.productions.length,
+      itemBuilder: (context, index) {
+        final prod = _viewModel.productions[index];
+        return _buildProductionItem(
+          orderNumber: 'Order #${prod.orderId}',
+          product: prod.productName,
+          machine: 'Queue #${index + 1}',
+          startTime: _formatDateTime(prod.createdAt),
+          progress: prod.completedQuantity / prod.targetQuantity,
+          completed: prod.completedQuantity,
+          total: prod.targetQuantity,
+          status: _getProductionStatus(prod.status),
+        );
+      },
+    );
+  }
+
+  String _formatDateTime(DateTime dt) {
+    return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+  }
+
+  ProductionStatus _getProductionStatus(String status) {
+    switch (status) {
+      case 'in progress':
+        return ProductionStatus.running;
+      case 'paused':
+        return ProductionStatus.paused;
+      case 'completed':
+        return ProductionStatus.completed;
+      default:
+        return ProductionStatus.paused;
+    }
+  }
+
+  Color _getAlertColor(String type) {
+    switch (type) {
+      case 'warning':
+        return Palette.pausedColor;
+      case 'error':
+        return Palette.urgentColor;
+      default:
+        return Palette.primaryBlue;
+    }
   }
 
   Widget _buildAlertCard({
@@ -188,19 +197,19 @@ class _ProductionManagementScreenState extends State<ProductionManagementScreen>
     );
   }
 
-  Widget _buildStatsGrid() {
+  Widget _buildStatsGrid(Map<String, dynamic> stats) {
     return Row(
       children: [
         Expanded(
           child: _buildStatCard(
-            number: '12',
+            number: stats['activeJobs']?.toString() ?? '0',
             label: 'Active Jobs',
           ),
         ),
         const SizedBox(width: 16),
         Expanded(
           child: _buildStatCard(
-            number: '85%',
+            number: '${(stats['efficiency'] ?? 0).round()}%',
             label: 'Efficiency',
           ),
         ),

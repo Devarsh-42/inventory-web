@@ -1,0 +1,239 @@
+// PRoduction table:
+
+create table public.productions (
+  id uuid not null default extensions.uuid_generate_v4 (),
+  target_quantity integer not null,
+  completed_quantity integer null default 0,
+  status text not null,
+  created_at timestamp with time zone null default now(),
+  updated_at timestamp with time zone null default now(),
+  order_id uuid null,
+  product_name text not null,
+  constraint productions_pkey primary key (id),
+  constraint productions_order_id_fkey foreign KEY (order_id) references orders (id),
+  constraint check_status check (
+    (
+      status = any (
+        array[
+          'queued'::text,
+          'in progress'::text,
+          'completed'::text,
+          'paused'::text
+        ]
+      )
+    )
+  )
+) TABLESPACE pg_default;
+
+create unique INDEX IF not exists unique_product_per_order_idx on public.productions using btree (order_id, product_name) TABLESPACE pg_default
+where
+  (order_id is not null);
+
+create trigger delete_null_orders_trigger
+after INSERT
+or
+update on productions for EACH STATEMENT
+execute FUNCTION delete_null_order_id_rows ();
+
+create trigger set_productions_updated_at BEFORE
+update on productions for EACH row
+execute FUNCTION set_updated_at ();
+
+
+
+//Production Queue Table
+create table public.production_queue (
+  id uuid not null default extensions.uuid_generate_v4 (),
+  production_id uuid not null,
+  queue_position serial not null,
+  created_at timestamp with time zone null default now(),
+  updated_at timestamp with time zone null default now(),
+  quantity integer null,
+  completed boolean null default false,
+  display_name text null,
+  status text not null default 'pending'::text,
+  created_by uuid null default auth.uid (),
+  constraint production_queue_pkey primary key (id),
+  constraint unique_queue_position unique (queue_position),
+  constraint production_queue_created_by_fkey foreign KEY (created_by) references auth.users (id),
+  constraint production_queue_production_id_fkey foreign KEY (production_id) references productions (id),
+  constraint check_queue_status check (
+    (
+      status = any (
+        array[
+          'pending'::text,
+          'in progress'::text,
+          'completed'::text,
+          'paused'::text
+        ]
+      )
+    )
+  )
+) TABLESPACE pg_default;
+
+create trigger set_production_queue_updated_at BEFORE
+update on production_queue for EACH row
+execute FUNCTION set_updated_at ();
+
+create trigger update_queue_and_production_trigger
+after
+update OF status on production_queue for EACH row
+execute FUNCTION update_queue_and_production ();
+
+//Production completion table
+create table public.production_completions (
+  id uuid not null default extensions.uuid_generate_v4 (),
+  production_id uuid not null,
+  product_name text not null,
+  quantity_completed integer not null,
+  completed_on timestamp with time zone null default now(),
+  shipped boolean null default false,
+  shipping_date timestamp with time zone null,
+  notes text null,
+  created_at timestamp with time zone null default now(),
+  updated_at timestamp with time zone null default now(),
+  order_id uuid null,
+  constraint completed_productions_pkey primary key (id),
+  constraint completed_productions_order_id_fkey foreign KEY (order_id) references orders (id) on delete CASCADE,
+  constraint completed_productions_production_id_fkey foreign KEY (production_id) references productions (id) on delete CASCADE,
+  constraint completed_productions_quantity_check check ((quantity_completed > 0))
+) TABLESPACE pg_default;
+
+create index IF not exists idx_completed_productions_order_id on public.production_completions using btree (order_id) TABLESPACE pg_default;
+
+create trigger check_order_completion_trigger
+after INSERT
+or
+update on production_completions for EACH row
+execute FUNCTION check_order_completion ();
+
+create trigger check_production_completion_trigger BEFORE INSERT on production_completions for EACH row
+execute FUNCTION check_production_completion ();
+
+create trigger create_dispatch_on_completion
+after INSERT on production_completions for EACH row
+execute FUNCTION create_dispatch_entry ();
+
+create trigger set_completed_productions_updated_at BEFORE
+update on production_completions for EACH row
+execute FUNCTION set_updated_at ();
+
+//orders table
+create table public.orders (
+  id uuid not null default extensions.uuid_generate_v4 (),
+  client_name text not null,
+  due_date timestamp with time zone not null,
+  created_date timestamp with time zone null default now(),
+  status text not null default 'queued'::text,
+  priority text not null default 'normal'::text,
+  special_instructions text null,
+  updated_at timestamp with time zone null default now(),
+  client_id uuid not null,
+  display_id character varying(4) null,
+  constraint orders_pkey primary key (id),
+  constraint orders_client_id_fkey foreign KEY (client_id) references clients (id) on delete set null
+) TABLESPACE pg_default;
+
+create index IF not exists idx_orders_client_id on public.orders using btree (client_id) TABLESPACE pg_default;
+
+create unique INDEX IF not exists idx_orders_display_id on public.orders using btree (display_id) TABLESPACE pg_default;
+
+create trigger set_order_display_id BEFORE INSERT on orders for EACH row
+execute FUNCTION generate_order_display_id ();
+
+// orders_products table
+create table public.order_products (
+  id uuid not null default extensions.uuid_generate_v4 (),
+  order_id uuid null,
+  name text not null,
+  quantity integer not null,
+  completed integer null default 0,
+  created_at timestamp with time zone null default now(),
+  constraint order_products_pkey primary key (id),
+  constraint order_products_order_id_fkey foreign KEY (order_id) references orders (id) on delete CASCADE
+) TABLESPACE pg_default;
+
+create trigger create_productions_after_order_product_insert
+after INSERT on order_products for EACH row
+execute FUNCTION update_or_insert_production ();
+
+// dispatch table
+create table public.dispatch (
+  id uuid not null default extensions.uuid_generate_v4 (),
+  order_id uuid not null,
+  client_id uuid not null,
+  dispatch_date timestamp with time zone null default now(),
+  status text not null default 'pending'::text,
+  shipping_notes text null,
+  created_at timestamp with time zone null default now(),
+  updated_at timestamp with time zone null default now(),
+  tracking_number text null,
+  shipped_on timestamp with time zone null,
+  constraint dispatch_pkey primary key (id),
+  constraint dispatch_order_id_unique unique (order_id),
+  constraint dispatch_client_id_fkey foreign KEY (client_id) references clients (id) on delete CASCADE,
+  constraint dispatch_order_id_fkey foreign KEY (order_id) references orders (id) on delete CASCADE,
+  constraint check_dispatch_status check (
+    (
+      status = any (
+        array[
+          'pending'::text,
+          'ready'::text,
+          'shipped'::text,
+          'delivered'::text
+        ]
+      )
+    )
+  )
+) TABLESPACE pg_default;
+
+create index IF not exists idx_dispatch_client_id on public.dispatch using btree (client_id) TABLESPACE pg_default;
+
+create index IF not exists idx_dispatch_order_id on public.dispatch using btree (order_id) TABLESPACE pg_default;
+
+create trigger set_dispatch_updated_at BEFORE
+update on dispatch for EACH row
+execute FUNCTION set_updated_at ();
+
+//dispatch items table
+create table public.dispatch_items (
+  id uuid not null default extensions.uuid_generate_v4 (),
+  dispatch_id uuid not null,
+  production_id uuid not null,
+  product_name text not null,
+  quantity integer not null,
+  is_ready boolean null default false,
+  created_at timestamp with time zone null default now(),
+  updated_at timestamp with time zone null default now(),
+  shipped boolean null default false,
+  ready_date timestamp with time zone null,
+  shipped_date timestamp with time zone null,
+  shipping_notes text null,
+  ready boolean null default false,
+  completed_production_id uuid null,
+  constraint dispatch_items_pkey primary key (id),
+  constraint dispatch_items_completed_production_id_fkey foreign KEY (completed_production_id) references production_completions (id),
+  constraint dispatch_items_dispatch_id_fkey foreign KEY (dispatch_id) references dispatch (id) on delete CASCADE,
+  constraint dispatch_items_production_id_fkey foreign KEY (production_id) references productions (id) on delete CASCADE
+) TABLESPACE pg_default;
+
+create index IF not exists idx_dispatch_items_dispatch_id on public.dispatch_items using btree (dispatch_id) TABLESPACE pg_default;
+
+create trigger check_dispatch_items_ready
+after
+update on dispatch_items for EACH row
+execute FUNCTION check_all_items_ready ();
+
+create trigger set_dispatch_items_updated_at BEFORE
+update on dispatch_items for EACH row
+execute FUNCTION set_updated_at ();
+
+create trigger update_dispatch_status
+after
+update OF ready on dispatch_items for EACH row when (new.ready is true)
+execute FUNCTION check_dispatch_ready ();
+
+create trigger update_dispatch_status_trigger
+after
+update on dispatch_items for EACH row
+execute FUNCTION update_dispatch_status ();

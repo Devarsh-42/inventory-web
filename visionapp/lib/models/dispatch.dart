@@ -17,6 +17,8 @@ class DispatchItem {
   final String clientName;  // Add this field
   final String? dispatchStatus;
   final DateTime? dispatchDate;
+  final String? batchNumber;  // Add this field
+  final int? batchQuantity;  // Add this field
 
   DispatchItem({
     required this.id,
@@ -34,6 +36,8 @@ class DispatchItem {
     this.shippingNotes,
     this.dispatchStatus,
     this.dispatchDate,
+    this.batchNumber,  // Add this parameter
+    this.batchQuantity,  // Add this parameter
     required this.createdAt,
     required this.updatedAt,
   });
@@ -65,6 +69,8 @@ class DispatchItem {
       dispatchDate: dispatch['dispatch_date'] != null 
           ? DateTime.parse(dispatch['dispatch_date'])
           : null,
+      batchNumber: dispatch['batch_number'],  // Add this field
+      batchQuantity: dispatch['batch_quantity'],  // Add this field
       createdAt: DateTime.parse(json['created_at']),
       updatedAt: DateTime.parse(json['updated_at']),
     );
@@ -83,6 +89,8 @@ class ClientDispatch {
   final String? trackingNumber;
   final DateTime? shippedOn;
   final String? shippingNotes;
+  final String? batchNumber;
+  final int? batchQuantity;  // Add this field
 
   ClientDispatch({
     required this.dispatchId,
@@ -94,6 +102,8 @@ class ClientDispatch {
     this.trackingNumber,
     this.shippedOn,
     this.shippingNotes,
+    this.batchNumber,
+    this.batchQuantity,  // Add this parameter
   });
 
   factory ClientDispatch.fromItems(String dispatchId, List<DispatchItem> items) {
@@ -101,13 +111,15 @@ class ClientDispatch {
     return ClientDispatch(
       dispatchId: dispatchId,
       clientId: firstItem.clientId,
-      clientName: firstItem.clientName,  // Use actual client name
+      clientName: firstItem.clientName,
       items: items,
       status: firstItem.dispatchStatus ?? (
         items.every((item) => item.shipped) ? 'shipped' :
         items.every((item) => item.isReady) ? 'ready' : 'pending'
       ),
       dispatchDate: firstItem.dispatchDate,
+      batchNumber: firstItem.batchNumber,
+      batchQuantity: firstItem.batchQuantity,  // Add this field
     );
   }
 

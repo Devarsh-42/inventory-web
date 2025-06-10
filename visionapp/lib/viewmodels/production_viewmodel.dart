@@ -2,17 +2,22 @@ import 'package:flutter/foundation.dart';
 import 'package:visionapp/repositories/production_completion_repository.dart';
 import '../models/production.dart';
 import '../repositories/production_repository.dart';
+import '../models/orders.dart'; 
+import '../repositories/orders_repository.dart';
 
 class ProductionViewModel extends ChangeNotifier {
   final ProductionRepository _repository;
+  final OrdersRepository _ordersRepository; // Add OrdersRepository
   bool _isLoading = false;
   String? _error;
   List<Production> _productions = [];
   Map<String, dynamic> _stats = {};
   List<String> _productNames = ['All Products'];
+  List<Order> _pendingOrders = []; // Add pendingOrders list
 
   ProductionViewModel({ProductionRepository? repository, required ProductionCompletionRepository completionRepository})
-      : _repository = repository ?? ProductionRepository();
+      : _repository = repository ?? ProductionRepository(),
+        _ordersRepository = OrdersRepository(); // Initialize OrdersRepository
 
   // Getters
   bool get isLoading => _isLoading;
@@ -20,6 +25,7 @@ class ProductionViewModel extends ChangeNotifier {
   List<Production> get productions => _productions;
   Map<String, dynamic> get stats => _stats;
   List<String> get productNames => _productNames;
+  List<Order> get pendingOrders => _pendingOrders; // Add getter for pendingOrders
 
   // Load all productions
   Future<void> loadProductions() async {
@@ -153,6 +159,81 @@ class ProductionViewModel extends ChangeNotifier {
     } catch (e) {
       _error = e.toString();
       notifyListeners();
+    }
+  }
+
+  // Add this method to ProductionViewModel class
+  Future<void> deleteCompletedProductions() async {
+    try {
+      _isLoading = true;
+      notifyListeners();
+      
+      await _repository.deleteCompletedProductions();
+      await loadProductions(); // Refresh the list
+      
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      throw Exception('Failed to delete completed productions: $e');
+    }
+  }
+
+  // Add this helper method
+  bool hasCompletedProductions() {
+    return _productions.any((production) => production.status == 'completed');
+  }
+
+  // Load pending orders
+  Future<void> loadPendingOrders() async {
+    try {
+      _isLoading = true;
+      notifyListeners();
+
+      final orders = await _ordersRepository.getPendingOrders();
+      _pendingOrders = orders;
+
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // Add these methods to ProductionViewModel class
+
+  Future<List<Map<String, dynamic>>> getActiveProductionDetails() async {
+    try {
+      final productions = await _repository.getAllProductions();
+      final List<Map<String, dynamic>> productionDetails = [];
+      
+      for (var prod in productions) {
+        if (prod.status != 'completed') {
+          // Get queue information for this production
+          final queueInfo = await _repository.getQueueInfoForProduction(prod.id);
+          
+          productionDetails.add({
+            'production': prod,
+            'queueInfo': queueInfo,
+          });
+        }
+      }
+      
+      return productionDetails;
+    } catch (e) {
+      throw Exception('Failed to fetch production details: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> getSystemAlerts() async {
+    try {
+      return await _repository.getSystemAlerts();
+    } catch (e) {
+      throw Exception('Failed to fetch system alerts: $e');
     }
   }
 }

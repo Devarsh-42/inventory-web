@@ -503,31 +503,75 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     }
   }
 
-  void _markAsCompleted() async {
-    try {
-      final ordersVM = Provider.of<OrdersViewModel>(context, listen: false);
-      await ordersVM.updateOrderStatus(widget.order.id, OrderStatus.completed);
-      
-      if (mounted) {
-        Navigator.pop(context); // Pop back to previous screen
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Order marked as completed!'),
-            backgroundColor: Color(0xFF10b981),
+// Update the _markAsCompleted method
+
+void _markAsCompleted() async {
+  try {
+    final ordersVM = Provider.of<OrdersViewModel>(context, listen: false);
+    await ordersVM.updateOrderStatus(widget.order.id, OrderStatus.completed);
+    
+    if (mounted) {
+      // Show completion dialog with delete option
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Order Completed'),
+          content: const Text(
+            'Order has been marked as completed. Would you like to delete all completed orders?'
           ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error marking as completed: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Keep Orders'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () async {
+                try {
+                  await ordersVM.deleteCompletedOrders();
+                  
+                  if (context.mounted) {
+                    Navigator.pop(context); // Close dialog
+                    Navigator.pop(context); // Return to previous screen
+                    
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Completed orders deleted successfully'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error deleting orders: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              },
+              child: const Text('Delete Completed Orders'),
+            ),
+          ],
+        ),
+      );
+    }
+  } catch (e) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error marking as completed: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
+}
 
   Future<void> _showAddProductDialog() async {
     final nameController = TextEditingController();

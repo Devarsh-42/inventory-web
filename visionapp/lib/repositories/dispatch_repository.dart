@@ -223,31 +223,24 @@ class DispatchRepository {
   }
 
   // Update the shipDispatch method
-  Future<void> shipDispatch(String dispatchId) async {
+  Future<void> shipDispatch(
+    String dispatchId, {
+    required String batchNumber,
+    required int batchQuantity,
+  }) async {
     try {
       final now = DateTime.now().toIso8601String();
       
-      // First get the dispatch to check if it exists and get the order_id
-      final dispatchResponse = await _supabaseService.client
-          .from('dispatch')
-          .select('id, order_id')
-          .eq('id', dispatchId)
-          .single();
-      
-      if (dispatchResponse == null) {
-        throw Exception('Dispatch not found');
-      }
-
-      // Use a single update for dispatch
       await _supabaseService.client
           .from('dispatch')
           .update({
             'status': 'shipped',
             'shipped_on': now,
+            'batch_number': batchNumber,
+            'batch_quantity': batchQuantity,
           })
           .eq('id', dispatchId);
 
-      // Update dispatch items
       await _supabaseService.client
           .from('dispatch_items')
           .update({
@@ -255,15 +248,6 @@ class DispatchRepository {
             'shipped_date': now,
           })
           .eq('dispatch_id', dispatchId);
-
-      // Update production_completions
-      await _supabaseService.client
-          .from('production_completions')
-          .update({
-            'shipped': true,
-            'shipping_date': now,
-          })
-          .eq('order_id', dispatchResponse['order_id']);
 
     } catch (e) {
       print('Error shipping dispatch: $e');

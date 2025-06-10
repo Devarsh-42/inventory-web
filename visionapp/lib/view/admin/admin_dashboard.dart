@@ -134,6 +134,56 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
+  void _showDeleteCompletedDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Completed Orders'),
+        content: const Text(
+          'Are you sure you want to delete all completed orders? This action cannot be undone.'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              try {
+                final ordersVM = Provider.of<OrdersViewModel>(context, listen: false);
+                Navigator.pop(context); // Close dialog
+                await ordersVM.deleteCompletedOrders();
+                
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Completed orders deleted successfully'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error deleting orders: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildHeader() {
     final isMobile = ResponsiveHelper.isMobile(context);
     
@@ -149,12 +199,30 @@ class _AdminDashboardState extends State<AdminDashboard> {
             letterSpacing: -0.5,
           ),
         ),
-        IconButton(
-          icon: const Icon(
-            Icons.logout,
-            color: Colors.white,
-          ),
-          onPressed: () => _showLogoutDialog(),
+        Row(
+          children: [
+            Consumer<OrdersViewModel>(
+              builder: (context, viewModel, _) {
+                if (viewModel.hasCompletedOrders()) {
+                  return IconButton(
+                    icon: const Icon(Icons.delete_sweep),
+                    onPressed: () => _showDeleteCompletedDialog(),
+                    tooltip: 'Delete Completed Orders',
+                    color: Colors.white,
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
+            IconButton(
+              onPressed: () => _showLogoutDialog(),
+              icon: const Icon(
+                Icons.logout,
+                color: Colors.white,
+              ),
+              tooltip: 'Logout',
+            ),
+          ],
         ),
       ],
     );

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:visionapp/core/services/supabase_services.dart';
 import 'package:visionapp/view/auth/login_screen.dart';
 import 'package:visionapp/view/production/add_product_screen.dart';
+import 'package:visionapp/view/production/production_bottom_nav.dart';
 import 'package:visionapp/view/production/production_details_screen.dart';
 import 'package:visionapp/view/production/production_management_screen.dart';
 import 'package:visionapp/view/production/production_queue_management_screen.dart';
@@ -43,6 +44,21 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
+          Consumer<ProductionViewModel>(
+            builder: (context, viewModel, _) {
+              if (viewModel.hasCompletedProductions()) {
+                return IconButton(
+                  icon: const Icon(
+                    Icons.delete_sweep,
+                    color: Colors.white,
+                  ),
+                  onPressed: () => _showDeleteCompletedDialog(context),
+                  tooltip: 'Delete Completed Productions',
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
           IconButton(
             icon: const Icon(
               Icons.logout,
@@ -167,7 +183,6 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
                             ),
                           ),
                           // Bottom Navigation
-                          _buildBottomNavigation(),
                         ],
                       );
                     },
@@ -178,6 +193,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
           ),
         ),
       ),
+      bottomNavigationBar: const ProductionBottomNav(currentRoute: '/dashboard'),
     );
   }
 
@@ -617,100 +633,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
       ),
     );
   }
-
-  Widget _buildBottomNavigation() {
-    return Container(
-      height: 70,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(
-          top: BorderSide(color: Color(0xFFF1F5F9)),
-        ),
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(24),
-          bottomRight: Radius.circular(24),
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildNavItem('Dashboard', Icons.dashboard, true),
-          _buildNavItem('Products', Icons.inventory, false),
-          _buildNavItem('Queue', Icons.queue, false),
-          _buildNavItem('Orders', Icons.list_alt, false),
-          _buildNavItem('Alerts', Icons.notifications, false),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNavItem(String label, IconData icon, bool isActive) {
-    return InkWell(
-      onTap: () => _handleNavigation(label),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(
-              gradient: isActive
-                  ? const LinearGradient(
-                      colors: [Color(0xFF1E40AF), Color(0xFF3B82F6)],
-                    )
-                  : null,
-              color: isActive ? null : const Color(0xFF64748B).withOpacity(0.2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              icon,
-              size: 16,
-              color: isActive ? Colors.white : const Color(0xFF64748B),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: isActive ? const Color(0xFF1E40AF) : const Color(0xFF64748B),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _handleNavigation(String label) {
-    if (label == 'Dashboard') return;
-
-    Widget screen;
-    switch (label) {
-      case 'Products':
-        screen = const ProductsScreen();
-        break;
-      case 'Queue':
-        screen = const ProductionQueueScreen();
-        break;
-      case 'Orders':
-        screen = const DispatchScreen(); // Updated to use DispatchScreen
-        break;
-      case 'Alerts':
-        screen = const ProductsScreen();
-        break;
-      default:
-        return;
-    }
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => screen,
-      ),
-    );
-  }
-
+  
   Future<void> _showLogoutDialog() async {
     return showDialog(
       context: context,
@@ -749,6 +672,56 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
           ],
         );
       },
+    );
+  }
+
+  void _showDeleteCompletedDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Completed Productions'),
+        content: const Text(
+          'Are you sure you want to delete all completed productions? This action cannot be undone.'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              try {
+                final viewModel = Provider.of<ProductionViewModel>(context, listen: false);
+                Navigator.pop(context);
+                await viewModel.deleteCompletedProductions();
+                
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Completed productions deleted successfully'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error deleting productions: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
     );
   }
 

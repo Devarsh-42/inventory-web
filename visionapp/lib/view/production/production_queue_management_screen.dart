@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:visionapp/models/production.dart';
+import 'package:visionapp/view/production/production_bottom_nav.dart';
 import 'package:visionapp/viewmodels/Production_queue_viewModel%20.dart';
 import 'package:visionapp/viewmodels/production_viewmodel.dart';
 import '../../models/Production_batch_model.dart';
@@ -89,6 +90,7 @@ class _ProductionQueueScreenState extends State<ProductionQueueScreen> {
               ),
             ),
           ),
+          bottomNavigationBar: ProductionBottomNav(currentRoute: '/queue'),
         );
       },
     );

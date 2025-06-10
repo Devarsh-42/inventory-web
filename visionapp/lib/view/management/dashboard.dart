@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:visionapp/view/common/widgets/bottom_nav_bar_widget.dart';
+import 'package:visionapp/viewmodels/orders_viewmodel.dart';
 
 class ManagementDashboardScreen extends StatelessWidget {
   const ManagementDashboardScreen({Key? key}) : super(key: key);
@@ -12,6 +14,13 @@ class ManagementDashboardScreen extends StatelessWidget {
         backgroundColor: const Color(0xFF6E00FF), // Purple color from image
         foregroundColor: Colors.white,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.delete_sweep),
+            onPressed: () => _showDeleteCompletedDialog(context),
+            tooltip: 'Delete Completed Orders',
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -75,6 +84,56 @@ class ManagementDashboardScreen extends StatelessWidget {
         ),
       ),
       bottomNavigationBar: const BottomNavigation(currentIndex: 0),
+    );
+  }
+
+  void _showDeleteCompletedDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Completed Orders'),
+        content: const Text(
+          'Are you sure you want to delete all completed orders? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              try {
+                Navigator.pop(context); // Close dialog
+                await Provider.of<OrdersViewModel>(context, listen: false)
+                    .deleteCompletedOrders();
+
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Completed orders deleted successfully'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error deleting orders: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
     );
   }
 }

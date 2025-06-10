@@ -65,42 +65,17 @@ class ProductionRepository {
 
   Future<Production> createProduction(Production production) async {
     try {
-      // Check if production with same name and null order_id exists
-      final existingProduction = await _supabaseService.client
-          .from(_tableName)
-          .select()
-          .eq('product_name', production.productName)
-          .filter('order_id', 'is', null)  // Changed from is_('order_id', null)
-          .maybeSingle();
+      final data = {
+        'product_name': production.productName,
+        'target_quantity': production.targetQuantity,
+        'completed_quantity': 0,
+        'status': 'queued', // Always start with queued status
+        'order_id': production.orderId,
+      };
 
-      if (existingProduction != null) {
-        // Update existing production instead of creating new one
-        final response = await _supabaseService.client
-            .from(_tableName)
-            .update({
-              'target_quantity': production.targetQuantity,
-              'completed_quantity': production.completedQuantity,
-              'status': production.status,
-              'order_id': production.orderId,
-              'updated_at': DateTime.now().toIso8601String(),
-            })
-            .eq('id', existingProduction['id'])
-            .select()
-            .single();
-
-        return Production.fromJson(response);
-      }
-
-      // Create new production if no existing one found
       final response = await _supabaseService.client
-          .from(_tableName)
-          .insert({
-            'product_name': production.productName,
-            'target_quantity': production.targetQuantity,
-            'completed_quantity': production.completedQuantity,
-            'status': production.status,
-            'order_id': production.orderId,
-          })
+          .from('productions')
+          .insert(data)
           .select()
           .single();
 
@@ -132,10 +107,10 @@ class ProductionRepository {
 
   Future<void> deleteProduction(String id) async {
     try {
-      await _supabaseService.client
-          .from(_tableName)
-          .delete()
-          .eq('id', id);
+      // Use a database function to handle all the deletions in a transaction
+      await _supabaseService.client.rpc('delete_production_cascade', params: {
+        'production_id': id
+      });
     } catch (e) {
       throw Exception('Failed to delete production: $e');
     }
@@ -210,6 +185,75 @@ class ProductionRepository {
           ));
     } catch (e) {
       throw Exception('Failed to cleanup orphaned productions: $e');
+    }
+  }
+
+  // Add this method to ProductionRepository class
+  Future<void> deleteCompletedProductions() async {
+    try {
+      await _supabaseService.client
+          .from(_tableName)
+          .delete()
+          .eq('status', 'completed');
+    } catch (e) {
+      throw Exception('Failed to delete completed productions: $e');
+    }
+  }
+
+  Future<void> updateProductionWithQueue(String productionId, String queueId, int completedQuantity) async {
+    try {
+      // Use a stored procedure to handle the transaction
+      await _supabaseService.client
+          .rpc('update_production_and_queue', params: {
+            'p_production_id': productionId,
+            'p_queue_id': queueId,
+            'p_completed_quantity': completedQuantity,
+          });
+    } catch (e) {
+      throw Exception('Failed to update production status: $e');
+    }
+  }
+
+  // Add these methods to ProductionRepository class
+
+  Future<Map<String, dynamic>> getQueueInfoForProduction(String productionId) async {
+    try {
+      final response = await _supabaseService.client
+          .from('production_queue')
+          .select()
+          .eq('production_id', productionId)
+          .order('queue_position');
+    
+      return {
+        'queue_items': response,
+        'total_queued': (response as List).fold<int>(0, 
+          (sum, item) => sum + ((item['quantity'] ?? 0) as num).toInt())
+      };
+    } catch (e) {
+      throw Exception('Failed to fetch queue info: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> getSystemAlerts() async {
+    try {
+      final productionAlerts = await _supabaseService.client
+          .from('productions')
+          .select()
+          .or('status.eq.paused,completed_quantity.lt.target_quantity')
+          .limit(5);
+
+      final queueAlerts = await _supabaseService.client
+          .from('production_queue')
+          .select()
+          .eq('status', 'paused')
+          .limit(5);
+
+      return {
+        'production_alerts': productionAlerts,
+        'queue_alerts': queueAlerts,
+      };
+    } catch (e) {
+      throw Exception('Failed to fetch system alerts: $e');
     }
   }
 }

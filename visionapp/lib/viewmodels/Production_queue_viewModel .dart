@@ -7,6 +7,20 @@ import '../repositories/orders_repository.dart';
 import '../repositories/dispatch_repository.dart';
 import '../core//services/supabase_services.dart';
 
+class ProductionQueueStatus {
+  static const String pending = 'pending';
+  static const String inProgress = 'in progress';
+  static const String completed = 'completed';
+  static const String paused = 'paused';
+}
+
+class ProductionsStatus {
+  static const String queued = 'queued';
+  static const String inProgress = 'in progress';
+  static const String completed = 'completed';
+  static const String paused = 'paused';
+}
+
 class ProductionQueueViewModel extends ChangeNotifier {
   final ProductionQueueRepository _repository;
   final OrdersRepository _ordersRepository;
@@ -47,6 +61,7 @@ class ProductionQueueViewModel extends ChangeNotifier {
       rethrow;
     }
   }
+
   // Reorder queue items
   void reorderQueue(int oldIndex, int newIndex) async {
     try {
@@ -132,80 +147,34 @@ class ProductionQueueViewModel extends ChangeNotifier {
 
   final _supabaseService = SupabaseService.instance;
 
-  // Update the markAsCompleted method to use the new schema
+  // FIXED: Simplified markAsCompleted method
   Future<void> markAsCompleted(String queueId, String productionId) async {
     try {
       _isLoading = true;
       _error = null;
       notifyListeners();
 
-      // Get production details before completing
-      final production = await _repository.getProductionById(productionId);
-      if (production == null) {
-        throw Exception('Production not found');
-      }
-
-      // Get queue item to get quantity
+      // Get queue item for quantity info
       final queueItem = _queueItems.firstWhere(
         (item) => item.id == queueId,
         orElse: () => throw Exception('Queue item not found'),
       );
 
-      // Start transaction
-      await _supabaseService.client.rpc('begin_transaction');
+      // Use the simplified repository method that trusts database triggers
+      await _repository.updateProductionWithQueue(
+        productionId,
+        queueId,
+        queueItem.quantity ?? 0
+      );
 
-      try {
-        // 1. Create production completion record
-        final completionResponse = await _supabaseService.client
-            .from('production_completions')
-            .insert({
-              'production_id': productionId,
-              'product_name': production.productName,
-              'quantity_completed': queueItem.quantity,
-              'order_id': production.orderId,
-              'completed_on': DateTime.now().toIso8601String(),
-              'notes': 'Completed from production queue',
-            })
-            .select()
-            .single();
+      // Wait a bit longer for all triggers to complete their work
+      await Future.delayed(const Duration(milliseconds: 300));
 
-        // 2. Update queue item status
-        await _supabaseService.client
-            .from('production_queue')
-            .update({
-              'status': 'completed',
-              'completed': true,
-              'updated_at': DateTime.now().toIso8601String(),
-            })
-            .eq('id', queueId);
+      // Reload queue to show updated status
+      await loadQueue();
 
-        // 3. Update production completed quantity
-        await _supabaseService.client
-            .from('productions')
-            .update({
-              'completed_quantity': production.completedQuantity + queueItem.quantity,
-              'updated_at': DateTime.now().toIso8601String(),
-            })
-            .eq('id', productionId);
-
-        // Commit transaction
-        await _supabaseService.client.rpc('commit_transaction');
-
-        // The create_dispatch_entry trigger will automatically handle:
-        // - Creating/updating dispatch record
-        // - Creating dispatch items
-        // - Linking completion to dispatch items
-
-        // Reload queue to show updated status
-        await loadQueue();
-
-        _isLoading = false;
-        notifyListeners();
-      } catch (e) {
-        // Rollback on any error
-        await _supabaseService.client.rpc('rollback_transaction');
-        throw Exception('Failed to complete production: $e');
-      }
+      _isLoading = false;
+      notifyListeners();
     } catch (e) {
       _error = e.toString();
       _isLoading = false;
@@ -225,26 +194,9 @@ class ProductionQueueViewModel extends ChangeNotifier {
     }
   }
 
-  // Add method to cleanup completed productions
-  Future<void> cleanupCompletedProductions() async {
-    try {
-      _isLoading = true;
-      notifyListeners();
+  // REMOVED: cleanupCompletedProductions method as it's handled by triggers
 
-      await _repository.processCompletedItems();
-      await loadQueue();
-
-      _isLoading = false;
-      notifyListeners();
-    } catch (e) {
-      _error = e.toString();
-      _isLoading = false;
-      notifyListeners();
-      rethrow;
-    }
-  }
-
-  // Update production status method
+  // FIXED: Simplified update production status method
   Future<void> updateProductionStatus(
     String queueId, 
     String productionId, 
@@ -255,13 +207,16 @@ class ProductionQueueViewModel extends ChangeNotifier {
       _error = null;
       notifyListeners();
 
+      // Use the simplified repository method
       await _repository.updateProductionStatus(
         queueId, 
         productionId, 
         status
       );
 
+      // If marking as completed, allow extra time for triggers
       if (status == 'completed') {
+        await Future.delayed(const Duration(milliseconds: 400));
         await _moveCompletedToBottom();
       }
 

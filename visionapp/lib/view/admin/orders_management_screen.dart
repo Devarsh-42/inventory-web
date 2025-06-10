@@ -77,21 +77,70 @@ class _OrdersManagementScreenState extends State<OrdersManagementScreen> {
     );
   }
 
-  PreferredSizeWidget _buildAppBar() {
+  AppBar _buildAppBar() {
     return AppBar(
-      backgroundColor: Colors.transparent,
+      title: const Text('Orders Management'),
+      backgroundColor: const Color(0xFF1E40AF),
+      foregroundColor: Colors.white,
       elevation: 0,
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Colors.white),
-        onPressed: () => Navigator.pop(context),
-      ),
-      title: const Text(
-        'Orders Management',
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
+      actions: [
+        // Add delete completed orders button
+        IconButton(
+          icon: const Icon(Icons.delete_sweep),
+          onPressed: () => _showDeleteCompletedDialog(),
+          tooltip: 'Delete Completed Orders',
         ),
+        // ...other existing actions...
+      ],
+    );
+  }
+
+  void _showDeleteCompletedDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Completed Orders'),
+        content: const Text(
+          'Are you sure you want to delete all completed orders? This action cannot be undone.'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              try {
+                final ordersVM = Provider.of<OrdersViewModel>(context, listen: false);
+                Navigator.pop(context); // Close dialog
+                await ordersVM.deleteCompletedOrders();
+                
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Completed orders deleted successfully'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error deleting orders: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Delete'),
+          ),
+        ],
       ),
     );
   }
@@ -600,6 +649,72 @@ class _OrdersManagementScreenState extends State<OrdersManagementScreen> {
       context,
       MaterialPageRoute(builder: (context) => AddOrderScreen()),
     );
+  }
+
+  void _onStatusChanged(Order order, OrderStatus newStatus) async {
+    try {
+      final ordersVM = Provider.of<OrdersViewModel>(context, listen: false);
+      await ordersVM.updateOrderStatus(order.id, newStatus);
+
+      // If order is marked as completed, show delete option
+      if (newStatus == OrderStatus.completed && mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Order Completed'),
+            content: const Text(
+              'Order has been marked as completed. Would you like to delete all completed orders?'
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Keep Orders'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () async {
+                  try {
+                    await ordersVM.deleteCompletedOrders();
+                    
+                    if (context.mounted) {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Completed orders deleted successfully'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Error deleting orders: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  }
+                },
+                child: const Text('Delete Completed Orders'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating order status: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   String _getStatusText(OrderStatus status) {

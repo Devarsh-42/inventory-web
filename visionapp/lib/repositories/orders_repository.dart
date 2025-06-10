@@ -206,4 +206,32 @@ class OrdersRepository {
       throw Exception('Failed to fetch order by ID: $e');
     }
   }
+
+  Future<void> deleteCompletedOrders() async {
+    try {
+      await _supabaseService.client
+          .from(_tableName)
+          .delete()
+          .eq('status', 'completed');
+    } catch (e) {
+      throw Exception('Failed to delete completed orders: $e');
+    }
+  }
+
+  Future<List<Order>> getPendingOrders() async {
+    try {
+      final response = await _supabaseService.client
+          .from(_tableName)
+          .select('''
+            *,
+            products:$_productsTable(*)
+          ''')
+          .eq('status', 'queued')
+          .order('due_date', ascending: true);
+
+      return (response as List).map((json) => Order.fromJson(json)).toList();
+    } catch (e) {
+      throw Exception('Failed to fetch pending orders: $e');
+    }
+  }
 }

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "785777720836",
+    "project_id": "inventory-81f56",
+    "storage_bucket": "inventory-81f56.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:785777720836:android:4003ce849699dc9d553f51",
+        "android_client_info": {
+          "package_name": "com.example.visionapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCfEUJFtjqGgs5f1I4_pZIqs99BfWA1Tqs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

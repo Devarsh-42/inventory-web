@@ -188,17 +188,120 @@ class _ReadyToShipScreenState extends State<ReadyToShipScreen> {
   }
 
   void _handleShipDispatch(ClientDispatch dispatch) async {
+    final batchNumberController = TextEditingController();
+    final batchQuantityController = TextEditingController();
+    final totalQuantity = dispatch.items.fold<int>(0, (sum, item) => sum + item.quantity);
+
+    // Show dialog to get batch number and quantity
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Ship Orders'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Batch Number',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[700],
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: batchNumberController,
+              decoration: const InputDecoration(
+                hintText: 'Enter batch number',
+                border: OutlineInputBorder(),
+              ),
+              autofocus: true,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Batch Quantity (max: $totalQuantity)',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[700],
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: batchQuantityController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                hintText: 'Enter quantity',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              final batchNumber = batchNumberController.text.trim();
+              final quantityText = batchQuantityController.text.trim();
+              final quantity = int.tryParse(quantityText);
+              
+              if (batchNumber.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please enter a batch number')),
+                );
+                return;
+              }
+              
+              if (quantity == null || quantity <= 0 || quantity > totalQuantity) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Please enter a valid quantity (1-$totalQuantity)')),
+                );
+                return;
+              }
+              
+              Navigator.pop(context, {
+                'batchNumber': batchNumber,
+                'quantity': quantity,
+              });
+            },
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+
+    // Dispose controllers
+    batchNumberController.dispose();
+    batchQuantityController.dispose();
+
+    if (result == null) return;
+
     try {
-      // Use the first item's dispatchId since that's our source of truth
       final dispatchId = dispatch.items.first.dispatchId;
-      await context.read<DispatchViewModel>().shipDispatch(dispatchId);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Orders shipped successfully')),
+      await context.read<DispatchViewModel>().shipDispatch(
+        dispatchId,
+        batchNumber: result['batchNumber'],
+        batchQuantity: result['quantity'],
       );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Orders shipped successfully with batch: ${result['batchNumber']} (Qty: ${result['quantity']})'
+            ),
+          ),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
     }
   }
 

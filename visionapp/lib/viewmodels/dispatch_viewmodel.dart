@@ -65,13 +65,21 @@ class DispatchViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> shipDispatch(String dispatchId) async {
+  Future<void> shipDispatch(
+    String dispatchId, {
+    required String batchNumber,
+    required int batchQuantity,
+  }) async {
     try {
       _isLoading = true;
       _error = null;
       notifyListeners();
 
-      await _repository.shipDispatch(dispatchId);
+      await _repository.shipDispatch(
+        dispatchId,
+        batchNumber: batchNumber,
+        batchQuantity: batchQuantity,
+      );
       await loadDispatchItems();
 
       _isLoading = false;

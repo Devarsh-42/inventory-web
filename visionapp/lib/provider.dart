@@ -11,7 +11,6 @@ import 'package:visionapp/repositories/client_repository.dart';
 import 'package:visionapp/repositories/product_repository.dart';
 import 'package:visionapp/repositories/orders_repository.dart';
 import 'package:visionapp/repositories/production_queue_repository.dart';
-import 'package:visionapp/repositories/completed_production_repository.dart';
 import 'package:visionapp/repositories/dispatch_repository.dart';
 
 // ViewModel imports

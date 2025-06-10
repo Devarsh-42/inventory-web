@@ -53,36 +53,38 @@ class ProductionQueueRepository {
           productionId: data['production_id'],
           queuePosition: data['queue_position'],
           quantity: data['quantity'] ?? 0,
-          production: Production.fromJson(data['productions']), // Changed from 'production' to 'productions'
+          production: Production.fromJson(data['productions']),
           batch: batchResponse != null ? ProductionBatch.fromJson(batchResponse) : null,
           createdAt: DateTime.parse(data['created_at']),
           updatedAt: DateTime.parse(data['updated_at']),
           completed: data['completed'] ?? false,
-          displayName: data['display_name'] ?? data['productions']['product_name'], // Changed from 'production' to 'productions'
+          displayName: data['display_name'] ?? data['productions']['product_name'],
         );
       }));
 
       return queueItems;
     } catch (e) {
-      print('Error fetching production queue: $e'); // Add logging
+      print('Error fetching production queue: $e');
       throw Exception('Failed to fetch production queue: $e');
     }
-  }  Future<void> updateQueueOrder(List<String> queueIds) async {
-  try {
-    await _supabaseService.client.rpc(
-      'batch_update_queue_positions',
-      params: {
-        'item_ids': queueIds,
-      },
-    );
-    
-    // Small delay to allow the database to process the changes
-    await Future.delayed(const Duration(milliseconds: 100));
-  } catch (e) {
-    print('Error updating queue order: $e');
-    throw Exception('Failed to update queue order: $e');
   }
-}
+
+  Future<void> updateQueueOrder(List<String> queueIds) async {
+    try {
+      await _supabaseService.client.rpc(
+        'batch_update_queue_positions',
+        params: {
+          'item_ids': queueIds,
+        },
+      );
+      
+      // Small delay to allow the database to process the changes
+      await Future.delayed(const Duration(milliseconds: 100));
+    } catch (e) {
+      print('Error updating queue order: $e');
+      throw Exception('Failed to update queue order: $e');
+    }
+  }
 
   Future<void> addToQueue(String productionId, int quantity) async {
     try {
@@ -216,56 +218,29 @@ class ProductionQueueRepository {
     }
   }
 
+  // FIXED: Simplified method that lets triggers handle the logic
   Future<void> updateProductionStatus(String queueId, String productionId, String status) async {
     try {
-      // Get queue item and production details first using a simpler query
-      final response = await _supabaseService.client
+      // Simply update the queue item status
+      // The trigger 'update_queue_and_production_trigger' will handle updating the production
+      await _supabaseService.client
           .from('production_queue')
-          .select('*, productions:production_id(*)')
-          .eq('id', queueId)
-          .maybeSingle();
+          .update({
+            'status': status,
+            'completed': status == 'completed',
+            'updated_at': DateTime.now().toIso8601String()
+          })
+          .eq('id', queueId);
 
-      if (response == null) {
-        throw Exception('Queue item not found');
-      }
-
-      final queueItem = response;
-      final production = queueItem['productions'];
-      final quantity = queueItem['quantity'] ?? 0;
-      final newCompletedQuantity = (production['completed_quantity'] as int) + quantity;
-
-      if (status == 'completed') {
-        // First update the production status
-        await _supabaseService.client
-            .from('productions')
-            .update({
-              'status': status,
-              'completed_quantity': newCompletedQuantity,
-              'updated_at': DateTime.now().toIso8601String()
-            })
-            .eq('id', productionId);
-
-        // Then update the queue item
-        await updateQueueItemStatus(queueId, status);
-
-        // Handle completion logic
-        if (newCompletedQuantity >= production['target_quantity']) {
-          await _supabaseService.client
-              .from('productions')
-              .update({'status': 'completed'})
-              .eq('id', productionId);
-        }
-      } else {
-        // For non-completed status, just update the queue item status
-        await updateQueueItemStatus(queueId, status);
-      }
+      // Small delay to allow triggers to complete
+      await Future.delayed(const Duration(milliseconds: 100));
+      
     } catch (e) {
       print('Error updating production status: $e');
       throw Exception('Failed to update production status: $e');
     }
   }
   
-  // Update the deleteAllQueueItems method
   Future<void> deleteAllQueueItems() async {
     try {
       // Use the stored procedure that handles deletion and cleanup
@@ -336,56 +311,23 @@ class ProductionQueueRepository {
     }
   }
 
+  // FIXED: Simplified method without manual transaction management
   Future<void> markItemAsCompleted(String queueId, String productionId) async {
     try {
-      await _supabaseService.client.rpc('begin_transaction');
+      // Simply update the queue item status to completed
+      // The trigger will handle creating the production completion only when all items are completed
+      await _supabaseService.client
+          .from('production_queue')
+          .update({
+            'status': 'completed',
+            'completed': true,
+            'updated_at': DateTime.now().toIso8601String()
+          })
+          .eq('id', queueId);
 
-      try {
-        final queueItem = await _supabaseService.client
-            .from('production_queue')
-            .select('''
-              *,
-              productions!inner (
-                id,
-                product_name,
-                order_id,
-                target_quantity,
-                completed_quantity,
-                status
-              )
-            ''')
-            .eq('id', queueId)
-            .single();
-
-        // Update queue item status - this will trigger the completion creation
-        await _supabaseService.client
-            .from('production_queue')
-            .update({
-              'status': 'completed',
-              'completed': true,
-            })
-            .eq('id', queueId);
-
-        // Update production completed quantity
-        final totalCompleted = (queueItem['productions']['completed_quantity'] ?? 0) + 
-                             queueItem['quantity'];
-
-        await _supabaseService.client
-            .from('productions')
-            .update({
-              'completed_quantity': totalCompleted,
-              'status': totalCompleted >= queueItem['productions']['target_quantity'] 
-                  ? 'completed' 
-                  : 'in progress',
-            })
-            .eq('id', productionId);
-
-        await _supabaseService.client.rpc('commit_transaction');
-
-      } catch (e) {
-        await _supabaseService.client.rpc('rollback_transaction');
-        throw e;
-      }
+      // Small delay to allow triggers to complete their work
+      await Future.delayed(const Duration(milliseconds: 200));
+      
     } catch (e) {
       print('Error marking item as completed: $e');
       throw Exception('Failed to mark item as completed: $e');
@@ -409,33 +351,70 @@ class ProductionQueueRepository {
           .update({
             'status': status,
             'completed': status == 'completed',
+            'updated_at': DateTime.now().toIso8601String()
           })
           .eq('id', queueId);
     } catch (e) {
       throw Exception('Failed to update queue item status: $e');
     }
   }
+// 
+  // REMOVED: processCompletedItems method as triggers handle this automatically
 
-  Future<void> processCompletedItems() async {
+  // FIXED: Updated to create production completion entries
+  Future<void> updateProductionWithQueue(String productionId, String queueId, int quantity) async {
     try {
+      // First get the production details to have all necessary information
+      final productionDetails = await _supabaseService.client
+          .from('productions')
+          .select('''
+            *,
+            orders!inner (
+              id
+            )
+          ''')
+          .eq('id', productionId)
+          .single();
+
+      // Start a transaction by using RPC
       await _supabaseService.client.rpc('begin_transaction');
 
-      // Insert completed productions
-      final completedProds = await _supabaseService.client
-          .rpc('process_completed_productions');
+      try {
+        // 1. Create the production completion entry
+        await _supabaseService.client
+            .from('production_completions')
+            .insert({
+              'production_id': productionId,
+              'product_name': productionDetails['product_name'],
+              'quantity_completed': quantity,
+              'completed_on': DateTime.now().toIso8601String(),
+              'order_id': productionDetails['orders']['id'],
+            });
 
-      // Create dispatch entries
-      final dispatchEntries = await _supabaseService.client
-          .rpc('create_dispatch_entries');
+        // 2. Update the queue item status
+        await _supabaseService.client
+            .from('production_queue')
+            .update({
+              'status': 'completed',
+              'completed': true,
+              'updated_at': DateTime.now().toIso8601String(),
+            })
+            .eq('id', queueId);
 
-      // Create dispatch items
-      await _supabaseService.client
-          .rpc('create_dispatch_items');
+        // Commit the transaction
+        await _supabaseService.client.rpc('commit_transaction');
 
-      await _supabaseService.client.rpc('commit_transaction');
+        // Allow time for triggers to complete their work
+        await Future.delayed(const Duration(milliseconds: 200));
+
+      } catch (e) {
+        // Rollback on any error
+        await _supabaseService.client.rpc('rollback_transaction');
+        throw e;
+      }
     } catch (e) {
-      await _supabaseService.client.rpc('rollback_transaction');
-      throw Exception('Failed to process completed items: $e');
+      print('Error in updateProductionWithQueue: $e');
+      throw Exception('Failed to update production status: $e');
     }
   }
 }

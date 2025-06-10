@@ -165,6 +165,17 @@ class OrdersViewModel extends ChangeNotifier {
     }
   }
 
+  Future<void> deleteCompletedOrders() async {
+    try {
+      await _ordersRepository.deleteCompletedOrders();
+      await loadOrders(); // Reload orders to refresh the list
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      throw e; // Rethrow to allow UI to handle the error
+    }
+  }
+
   List<Order> get recentOrders {
     final sortedOrders = List<Order>.from(_orders)
       ..sort((a, b) => b.createdDate.compareTo(a.createdDate));
@@ -227,6 +238,10 @@ class OrdersViewModel extends ChangeNotifier {
     return _orders
         .where((order) => order.status == OrderStatus.completed)
         .toList();
+  }
+
+  bool hasCompletedOrders() {
+    return _orders.any((order) => order.status == OrderStatus.completed);
   }
 
   bool isClientOrdersCompleted(String clientId) {

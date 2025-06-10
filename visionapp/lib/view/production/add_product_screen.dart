@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../viewmodels/production_viewmodel.dart';
 import '../../models/production.dart';
+import 'production_bottom_nav.dart';
 
 class AddProductScreen extends StatefulWidget {
   final Production? production; // For editing existing production
@@ -34,6 +35,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
     if (widget.production != null) {
       _populateFields();
     }
+    
+    // Add listener to completed quantity
+    _completedQuantityController.addListener(_checkCompletionStatus);
   }
 
   void _populateFields() {
@@ -46,10 +50,24 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   @override
   void dispose() {
+    _completedQuantityController.removeListener(_checkCompletionStatus);
     _productNameController.dispose();
     _targetQuantityController.dispose();
     _completedQuantityController.dispose();
     super.dispose();
+  }
+
+  void _checkCompletionStatus() {
+    if (!mounted) return;
+    
+    final completedQty = int.tryParse(_completedQuantityController.text) ?? 0;
+    final targetQty = int.tryParse(_targetQuantityController.text) ?? 0;
+    
+    if (completedQty >= targetQty && targetQty > 0) {
+      setState(() {
+        _selectedStatus = 'completed';
+      });
+    }
   }
 
   InputDecoration _buildInputDecoration(String hint) {
@@ -103,12 +121,17 @@ class _AddProductScreenState extends State<AddProductScreen> {
     setState(() => _isLoading = true);
 
     try {
+      // Determine status based on quantities
+      final targetQty = int.parse(_targetQuantityController.text);
+      final completedQty = int.tryParse(_completedQuantityController.text) ?? 0;
+      final status = completedQty >= targetQty ? 'completed' : _selectedStatus;
+
       final production = Production(
         id: widget.production?.id,
         productName: _productNameController.text,
-        targetQuantity: int.parse(_targetQuantityController.text),
-        completedQuantity: int.tryParse(_completedQuantityController.text) ?? 0,
-        status: _selectedStatus,
+        targetQuantity: targetQty,
+        completedQuantity: completedQty,
+        status: status,
       );
 
       if (widget.production != null) {
@@ -300,6 +323,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                                               controller: _completedQuantityController,
                                               decoration: _buildInputDecoration('Enter completed quantity'),
                                               keyboardType: TextInputType.number,
+                                              enabled: _selectedStatus != 'completed', // Disable if completed
                                               validator: (value) {
                                                 if (value?.isEmpty ?? true) {
                                                   return 'Completed quantity is required';
@@ -409,6 +433,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
           ),
         ),
       ),
+      bottomNavigationBar: const ProductionBottomNav(currentRoute: '/products'),
     );
   }
 }

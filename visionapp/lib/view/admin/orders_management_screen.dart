@@ -8,6 +8,7 @@ import '../../view/widgets/custom_button.dart';
 import '../../view/widgets/custom_textfield.dart';
 import '../../core/constants/app_scrings.dart';
 import 'order_details_screen.dart';
+import '../admin/admin_bottom_nav.dart';
 
 class OrdersManagementScreen extends StatefulWidget {
   @override
@@ -17,6 +18,8 @@ class OrdersManagementScreen extends StatefulWidget {
 class _OrdersManagementScreenState extends State<OrdersManagementScreen> {
   final TextEditingController _searchController = TextEditingController();
   OrderStatus? _selectedStatusFilter;
+
+  final int _selectedIndex = 1; // Orders tab
 
   @override
   void initState() {
@@ -74,6 +77,10 @@ class _OrdersManagementScreenState extends State<OrdersManagementScreen> {
         ),
       ),
       floatingActionButton: _buildFloatingActionButton(),
+      bottomNavigationBar: AdminBottomNav(
+        selectedIndex: _selectedIndex,
+        onItemTapped: (index) => AdminBottomNav.handleNavigation(context, index),
+      ),
     );
   }
 

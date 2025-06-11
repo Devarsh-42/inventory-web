@@ -206,11 +206,14 @@ class _DispatchScreenState extends State<DispatchScreen> {
   }
 
   Widget _buildClientDispatchCard(ClientDispatch dispatch) {
+    final isShipped = dispatch.status == 'shipped';
+    
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
+        border: isShipped ? Border.all(color: Colors.green[200]!, width: 2) : null,
         boxShadow: [
           BoxShadow(
             color: Colors.grey.withOpacity(0.1),
@@ -227,7 +230,9 @@ class _DispatchScreenState extends State<DispatchScreen> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: const Color(0xFF1E40AF).withOpacity(0.05),
+              color: isShipped 
+                  ? Colors.green[50] 
+                  : const Color(0xFF1E40AF).withOpacity(0.05),
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(16),
                 topRight: Radius.circular(16),
@@ -256,7 +261,7 @@ class _DispatchScreenState extends State<DispatchScreen> {
                           fontWeight: FontWeight.w500,
                         ),
                       ),
-                      // Show batch number if shipped
+                      // Show batch info if shipped
                       if (dispatch.batchNumber != null) ...[
                         const SizedBox(height: 8),
                         Container(
@@ -273,7 +278,7 @@ class _DispatchScreenState extends State<DispatchScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
-                                Icons.local_shipping,
+                                Icons.inventory_2,
                                 size: 16,
                                 color: Colors.green[700],
                               ),
@@ -286,6 +291,17 @@ class _DispatchScreenState extends State<DispatchScreen> {
                                   color: Colors.green[700],
                                 ),
                               ),
+                              if (dispatch.batchQuantity != null) ...[
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Qty: ${dispatch.batchQuantity}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.green[700],
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),
@@ -293,7 +309,47 @@ class _DispatchScreenState extends State<DispatchScreen> {
                     ],
                   ),
                 ),
-                if (dispatch.canShip && dispatch.batchNumber == null)
+                if (isShipped)
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.green[100],
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.check_circle,
+                              size: 18,
+                              color: Colors.green[700],
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Shipped',
+                              style: TextStyle(
+                                color: Colors.green[700],
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        onPressed: () => _handleDeleteShippedOrder(dispatch),
+                        icon: const Icon(Icons.delete_outline),
+                        color: Colors.red[600],
+                        tooltip: 'Delete shipped order',
+                      ),
+                    ],
+                  )
+                else if (dispatch.canShip)
                   ElevatedButton.icon(
                     onPressed: () => _handleShipOrder(dispatch),
                     icon: const Icon(Icons.local_shipping, size: 18),
@@ -309,35 +365,6 @@ class _DispatchScreenState extends State<DispatchScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       elevation: 2,
-                    ),
-                  )
-                else if (dispatch.batchNumber != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.green[100],
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.check_circle,
-                          size: 18,
-                          color: Colors.green[700],
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Shipped',
-                          style: TextStyle(
-                            color: Colors.green[700],
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
                     ),
                   ),
               ],
@@ -678,18 +705,48 @@ class _DispatchScreenState extends State<DispatchScreen> {
             onPressed: () async {
               final batchNumber = batchNumberController.text.trim();
               final quantityText = batchQuantityController.text.trim();
-              final quantity = int.tryParse(quantityText) ?? 0;
+              // 
+              // If both fields are empty, proceed without batch data
+              if (batchNumber.isEmpty && quantityText.isEmpty) {
+                try {
+                  await context.read<DispatchViewModel>().shipDispatch(
+                    dispatch.items.first.dispatchId,
+                  );
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('Order shipped successfully'),
+                      backgroundColor: Colors.green[600],
+                    ),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error: $e'),
+                      backgroundColor: Colors.red[600],
+                    ),
+                  );
+                }
+                return;
+              }
 
-              if (batchNumber.isEmpty) {
+              // If either field is filled, both must be filled
+              if (batchNumber.isEmpty || quantityText.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please enter a batch number')),
+                  const SnackBar(
+                    content: Text('Please provide both batch number and quantity or leave both empty'),
+                  ),
                 );
                 return;
               }
 
-              if (quantity <= 0 || quantity > totalQuantity) {
+              // Parse and validate quantity
+              final quantity = int.tryParse(quantityText);
+              if (quantity == null || quantity <= 0 || quantity > totalQuantity) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Please enter a valid quantity (1-$totalQuantity)')),
+                  SnackBar(
+                    content: Text('Please enter a valid quantity (1-$totalQuantity)'),
+                  ),
                 );
                 return;
               }
@@ -701,9 +758,18 @@ class _DispatchScreenState extends State<DispatchScreen> {
                   batchQuantity: quantity,
                 );
                 Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Text('Order shipped successfully'),
+                    backgroundColor: Colors.green[600],
+                  ),
+                );
               } catch (e) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Error: $e')),
+                  SnackBar(
+                    content: Text('Error: $e'),
+                    backgroundColor: Colors.red[600],
+                  ),
                 );
               }
             },
@@ -723,6 +789,72 @@ class _DispatchScreenState extends State<DispatchScreen> {
       ),
     );
   }
+
+  void _handleDeleteShippedOrder(ClientDispatch dispatch) {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.red[50],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(Icons.delete_outline, color: Colors.red[600], size: 20),
+          ),
+          const SizedBox(width: 12),
+          const Text('Delete Shipped Order', 
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+        ],
+      ),
+      content: Text('Are you sure you want to delete this shipped order for ${dispatch.clientName}?'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            try {
+              await context.read<DispatchViewModel>()
+                  .deleteShippedDispatch(dispatch.dispatchId);
+              Navigator.pop(context);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Text('Shipped order deleted successfully'),
+                    backgroundColor: Colors.green[600],
+                  ),
+                );
+              }
+            } catch (e) {
+              Navigator.pop(context);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Error deleting order: $e'),
+                    backgroundColor: Colors.red[600],
+                  ),
+                );
+              }
+            }
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.red[600],
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          child: const Text('Delete'),
+        ),
+      ],
+    ),
+  );
+}
 
   String _formatDate(DateTime date) {
     return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';

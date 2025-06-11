@@ -67,19 +67,32 @@ class DispatchViewModel extends ChangeNotifier {
 
   Future<void> shipDispatch(
     String dispatchId, {
-    required String batchNumber,
-    required int batchQuantity,
+    String? batchNumber,
+    int? batchQuantity,
   }) async {
     try {
+      if (dispatchId.isEmpty) {
+        throw Exception('Invalid dispatch ID');
+      }
+
+      // Validate batch data consistency
+      final hasBatchNumber = batchNumber?.isNotEmpty ?? false;
+      final hasBatchQuantity = batchQuantity != null && batchQuantity > 0;
+
+      if (hasBatchNumber != hasBatchQuantity) {
+        throw Exception('Both batch number and quantity must be provided together');
+      }
+
       _isLoading = true;
       _error = null;
       notifyListeners();
 
       await _repository.shipDispatch(
         dispatchId,
-        batchNumber: batchNumber,
-        batchQuantity: batchQuantity,
+        batchNumber: hasBatchNumber ? batchNumber : null,
+        batchQuantity: hasBatchQuantity ? batchQuantity : null,
       );
+      
       await loadDispatchItems();
 
       _isLoading = false;
@@ -89,6 +102,26 @@ class DispatchViewModel extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
       throw e;
+    }
+  }
+
+  // Add this method to DispatchViewModel class
+  Future<void> deleteShippedDispatch(String dispatchId) async {
+    try {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      await _repository.deleteShippedDispatch(dispatchId);
+      await loadDispatchItems(); // Refresh the list after deletion
+
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      throw e; // Re-throw to handle in UI
     }
   }
 }

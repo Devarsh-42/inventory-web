@@ -5,7 +5,8 @@ class DispatchItem {
   final String? completedProductionId;
   final String productName;
   final int quantity;
-  final bool isReady;  // Changed from nullable
+  final bool isReady;  // This matches the database column name
+  final bool ready;    // This is the additional field
   final DateTime? readyDate;
   final bool shipped;  // Changed from nullable
   final DateTime? shippedDate;
@@ -29,7 +30,8 @@ class DispatchItem {
     this.completedProductionId,
     required this.productName,
     required this.quantity,
-    this.isReady = false,  // Default to false instead of null
+    this.isReady = false,
+    this.ready = false,    // Add this field
     this.readyDate,
     this.shipped = false,  // Default to false instead of null
     this.shippedDate,
@@ -43,7 +45,6 @@ class DispatchItem {
   });
 
   factory DispatchItem.fromJson(Map<String, dynamic> json) {
-    // Get the nested dispatch data
     final dispatch = json['dispatch'] as Map<String, dynamic>? ?? {};
     final client = dispatch['clients'] as Map<String, dynamic>? ?? {};
     
@@ -51,12 +52,13 @@ class DispatchItem {
       id: json['id'],
       dispatchId: json['dispatch_id'],
       productionId: json['production_id'],
-      clientId: dispatch['client_id'] ?? '', // Get from nested dispatch object
-      clientName: client['name'] ?? 'Unknown Client',  // Get actual client name
+      clientId: dispatch['client_id'] ?? '',
+      clientName: client['name'] ?? 'Unknown Client',
       completedProductionId: json['completed_production_id'],
       productName: json['product_name'],
       quantity: json['quantity'],
       isReady: json['is_ready'] ?? false,
+      ready: json['ready'] ?? false,
       readyDate: json['ready_date'] != null 
           ? DateTime.parse(json['ready_date']) 
           : null,
@@ -65,18 +67,18 @@ class DispatchItem {
           ? DateTime.parse(json['shipped_date']) 
           : null,
       shippingNotes: json['shipping_notes'],
-      dispatchStatus: dispatch['status'],  // Get from nested dispatch object
+      dispatchStatus: dispatch['status'],
       dispatchDate: dispatch['dispatch_date'] != null 
-          ? DateTime.parse(dispatch['dispatch_date'])
+          ? DateTime.parse(dispatch['dispatch_date']) 
           : null,
-      batchNumber: dispatch['batch_number'],  // Add this field
-      batchQuantity: dispatch['batch_quantity'],  // Add this field
+      batchNumber: dispatch['batch_number'],
+      batchQuantity: dispatch['batch_quantity'],
       createdAt: DateTime.parse(json['created_at']),
       updatedAt: DateTime.parse(json['updated_at']),
     );
   }
 
-  bool get canMarkReady => !isReady && !shipped;
+  bool get canMarkReady => !isReady && !ready && !shipped;
 }
 
 class ClientDispatch {

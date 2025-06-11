@@ -107,10 +107,23 @@ class ProductionRepository {
 
   Future<void> deleteProduction(String id) async {
     try {
-      // Use a database function to handle all the deletions in a transaction
-      await _supabaseService.client.rpc('delete_production_cascade', params: {
-        'production_id': id
-      });
+      // First delete all queue items for this production
+      await _supabaseService.client
+          .from('production_queue')
+          .delete()
+          .eq('production_id', id);
+
+      // Then delete all production completions
+      await _supabaseService.client
+          .from('production_completions')
+          .delete()
+          .eq('production_id', id);
+
+      // Finally delete the production itself
+      await _supabaseService.client
+          .from('productions')
+          .delete()
+          .eq('id', id);
     } catch (e) {
       throw Exception('Failed to delete production: $e');
     }
@@ -191,11 +204,67 @@ class ProductionRepository {
   // Add this method to ProductionRepository class
   Future<void> deleteCompletedProductions() async {
     try {
-      await _supabaseService.client
-          .from(_tableName)
-          .delete()
+      // First, get all completed productions
+      final completedProds = await _supabaseService.client
+          .from('productions')
+          .select('id')
           .eq('status', 'completed');
+
+      for (var prod in completedProds) {
+        final productionId = prod['id'];
+
+        // Check if any completion records are referenced in dispatch_items
+        final completions = await _supabaseService.client
+            .from('production_completions')
+            .select('id')
+            .eq('production_id', productionId);
+
+        for (var completion in completions) {
+          // Check if this completion is referenced in dispatch_items
+          final dispatchItemsCheck = await _supabaseService.client
+              .from('dispatch_items')
+              .select('id')
+              .eq('completed_production_id', completion['id']);
+
+          // Only delete if not referenced in dispatch_items
+          if ((dispatchItemsCheck as List).isEmpty) {
+            await _supabaseService.client
+                .from('production_completions')
+                .delete()
+                .eq('id', completion['id']);
+          }
+        }
+
+        // Check if this production has any items in the queue
+        final queueCheck = await _supabaseService.client
+            .from('production_queue')
+            .select('id')
+            .eq('production_id', productionId);
+
+        // Delete from queue if exists
+        if ((queueCheck as List).isNotEmpty) {
+          await _supabaseService.client
+              .from('production_queue')
+              .delete()
+              .eq('production_id', productionId);
+        }
+
+        // Check if this production can be deleted
+        final dispatchItemsCheck = await _supabaseService.client
+            .from('dispatch_items')
+            .select('id')
+            .eq('production_id', productionId);
+
+        // Only delete the production if it's not referenced in dispatch_items
+        if ((dispatchItemsCheck as List).isEmpty) {
+          await _supabaseService.client
+              .from('productions')
+              .delete()
+              .eq('id', productionId);
+        }
+      }
     } catch (e) {
+      print('Error deleting completed productions: $e');
       throw Exception('Failed to delete completed productions: $e');
     }
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:visionapp/view/admin/admin_bottom_nav.dart';
 import '../../pallet.dart';
 import '../../core/utils/responsive_helper.dart';
 import '../../models/Orders.dart';
@@ -11,6 +12,7 @@ class PerformanceManagementScreen extends StatefulWidget {
 }
 
 class _PerformanceManagementScreenState extends State<PerformanceManagementScreen> {
+  final int _selectedIndex = 2; // Performance tab
   String selectedTimeframe = 'Monthly';
   final List<String> timeframes = ['Yearly', 'Monthly', 'Weekly'];
   
@@ -85,6 +87,10 @@ class _PerformanceManagementScreenState extends State<PerformanceManagementScree
             ],
           ),
         ),
+      ),
+      bottomNavigationBar: AdminBottomNav(
+        selectedIndex: _selectedIndex,
+        onItemTapped: (index) => AdminBottomNav.handleNavigation(context, index),
       ),
     );
   }

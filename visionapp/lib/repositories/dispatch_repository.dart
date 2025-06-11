@@ -20,6 +20,8 @@ class DispatchRepository {
             shipping_notes,
             tracking_number,
             shipped_on,
+            batch_number,
+            batch_quantity,
             clients:client_id (
               id,
               name
@@ -225,33 +227,91 @@ class DispatchRepository {
   // Update the shipDispatch method
   Future<void> shipDispatch(
     String dispatchId, {
-    required String batchNumber,
-    required int batchQuantity,
+    String? batchNumber,
+    int? batchQuantity,
   }) async {
     try {
       final now = DateTime.now().toIso8601String();
       
+      // First verify items exist and are ready
+      final itemsResponse = await _supabaseService.client
+          .from('dispatch_items')
+          .select('id, is_ready')
+          .eq('dispatch_id', dispatchId);
+    
+      final items = itemsResponse as List;
+      if (items.isEmpty) {
+        throw Exception('No items found for this dispatch');
+      }
+
+      // Prepare update data for dispatch
+      Map<String, dynamic> dispatchUpdate = {
+        'status': 'shipped',
+        'shipped_on': now,
+      };
+
+      // Add batch data if provided
+      if (batchNumber?.isNotEmpty == true && batchQuantity != null && batchQuantity > 0) {
+        dispatchUpdate['batch_number'] = batchNumber;
+        dispatchUpdate['batch_quantity'] = batchQuantity;
+      }
+
+      // Update dispatch status first
       await _supabaseService.client
           .from('dispatch')
-          .update({
-            'status': 'shipped',
-            'shipped_on': now,
-            'batch_number': batchNumber,
-            'batch_quantity': batchQuantity,
-          })
+          .update(dispatchUpdate)
           .eq('id', dispatchId);
 
+      // Then update all dispatch items
       await _supabaseService.client
           .from('dispatch_items')
           .update({
             'shipped': true,
             'shipped_date': now,
+            'is_ready': true,
+            'ready': true,
           })
           .eq('dispatch_id', dispatchId);
 
     } catch (e) {
       print('Error shipping dispatch: $e');
       throw Exception('Failed to ship dispatch: $e');
+    }
+  }
+
+  // Add this method to DispatchRepository class
+  Future<void> deleteShippedDispatch(String dispatchId) async {
+    try {
+      // First check if dispatch exists and is shipped
+      final dispatchResponse = await _supabaseService.client
+          .from('dispatch')
+          .select()
+          .eq('id', dispatchId)
+          .single();
+
+      if (dispatchResponse == null) {
+        throw Exception('Dispatch not found');
+      }
+
+      if (dispatchResponse['status'] != 'shipped') {
+        throw Exception('Can only delete shipped dispatches');
+      }
+
+      // Delete dispatch items first (will cascade to dispatch table)
+      await _supabaseService.client
+          .from('dispatch_items')
+          .delete()
+          .eq('dispatch_id', dispatchId);
+
+      // Then delete the dispatch entry
+      await _supabaseService.client
+          .from('dispatch')
+          .delete()
+          .eq('id', dispatchId);
+
+    } catch (e) {
+      print('Error deleting shipped dispatch: $e');
+      throw Exception('Failed to delete shipped dispatch: $e');
     }
   }
 }

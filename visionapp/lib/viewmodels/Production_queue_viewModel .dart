@@ -337,9 +337,10 @@ class ProductionQueueViewModel extends ChangeNotifier {
         await _repository.removeFromQueue(item.id);
       }
 
-      // Remove completed items from local list
-      _queueItems.removeWhere((item) => item.isCompleted);
-      
+      // Reload queue to ensure we have the latest state
+      await loadQueue();
+
+      _isLoading = false;
       notifyListeners();
     } catch (e) {
       _error = e.toString();

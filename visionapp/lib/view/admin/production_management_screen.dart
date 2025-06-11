@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:visionapp/repositories/product_repository.dart';
 import 'package:visionapp/repositories/production_completion_repository.dart';
+import 'package:visionapp/view/admin/admin_bottom_nav.dart';
 import 'package:visionapp/viewmodels/production_viewmodel.dart';
 import 'package:visionapp/repositories/production_repository.dart';
 import '../../pallet.dart';
 import '../../core/utils/responsive_helper.dart';// Adjust the import based on your project structure
+
 
 class ProductionManagementScreen extends StatefulWidget {
   const ProductionManagementScreen({Key? key}) : super(key: key);
@@ -15,6 +17,7 @@ class ProductionManagementScreen extends StatefulWidget {
 
 class _ProductionManagementScreenState extends State<ProductionManagementScreen> {
   late ProductionViewModel _viewModel;
+  final int _selectedIndex = 3; // Production tab
 
   @override
   void initState() {
@@ -89,6 +92,10 @@ class _ProductionManagementScreenState extends State<ProductionManagementScreen>
         },
         child: const Icon(Icons.add),
         backgroundColor: Palette.primaryBlue,
+      ),
+      bottomNavigationBar: AdminBottomNav(
+        selectedIndex: _selectedIndex,
+        onItemTapped: (index) => AdminBottomNav.handleNavigation(context, index),
       ),
     );
   }

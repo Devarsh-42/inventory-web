@@ -181,21 +181,43 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
           );
         }
 
-        return RefreshIndicator(
-          onRefresh: () => viewModel.loadProductions(),
-          color: const Color(0xFF3B82F6),
-          child: ListView.builder(
-            itemCount: viewModel.productions.length,
-            itemBuilder: (context, index) {
-              final production = viewModel.productions[index];
-              return ProductionCard(
-                production: production,
-                onEdit: () => _editProduction(production),
-                onDelete: () => _deleteProduction(production),
-                onShip: production.isCompleted ? () => _shipProduction(production) : null,
-              );
-            },
-          )
+        return Column(
+          children: [
+            if (viewModel.hasCompletedProductions()) ...[
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: ElevatedButton.icon(
+                  onPressed: () => _showDeleteCompletedDialog(context),
+                  icon: const Icon(Icons.delete_sweep),
+                  label: const Text('Delete All Completed'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFEF4444),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: () => viewModel.loadProductions(),
+                color: const Color(0xFF3B82F6),
+                child: ListView.builder(
+                  itemCount: viewModel.productions.length,
+                  itemBuilder: (context, index) {
+                    final production = viewModel.productions[index];
+                    return ProductionCard(
+                      production: production,
+                      onEdit: () => _editProduction(production),
+                      onDelete: () => _deleteProduction(production),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ],
         );
       },
     );
@@ -435,14 +457,12 @@ class ProductionCard extends StatelessWidget {
   final Production production;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
-  final VoidCallback? onShip;
 
   const ProductionCard({
     Key? key,
     required this.production,
     required this.onEdit,
     required this.onDelete,
-    this.onShip,
   }) : super(key: key);
 
   @override
@@ -451,7 +471,12 @@ class ProductionCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border.all(color: const Color(0xFFF1F5F9), width: 2),
+        border: Border.all(
+          color: production.isCompleted 
+              ? const Color(0xFF10B981) 
+              : const Color(0xFFF1F5F9),
+          width: 2
+        ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -466,7 +491,6 @@ class ProductionCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -498,10 +522,6 @@ class ProductionCard extends StatelessWidget {
                 ),
                 Row(
                   children: [
-                    if (production.isCompleted && onShip != null) ...[
-                      _buildActionButton('Ship', const Color(0xFF10B981), onShip!),
-                      const SizedBox(width: 6),
-                    ],
                     _buildActionButton('Edit', const Color(0xFF3B82F6), onEdit),
                     const SizedBox(width: 6),
                     _buildActionButton('Delete', const Color(0xFFEF4444), onDelete),

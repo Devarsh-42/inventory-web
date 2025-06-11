@@ -40,34 +40,6 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF1E40AF),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        actions: [
-          Consumer<ProductionViewModel>(
-            builder: (context, viewModel, _) {
-              if (viewModel.hasCompletedProductions()) {
-                return IconButton(
-                  icon: const Icon(
-                    Icons.delete_sweep,
-                    color: Colors.white,
-                  ),
-                  onPressed: () => _showDeleteCompletedDialog(context),
-                  tooltip: 'Delete Completed Productions',
-                );
-              }
-              return const SizedBox.shrink();
-            },
-          ),
-          IconButton(
-            icon: const Icon(
-              Icons.logout,
-              color: Colors.white,
-            ),
-            onPressed: () => _showLogoutDialog(),
-          ),
-        ],
-      ),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -83,23 +55,66 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              // Header
-              Container(
-                padding: const EdgeInsets.all(24),
-                child: const Text(
-                  'Production Dashboard',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 28,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.5,
-                  ),
+              // Header with title and actions
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Production Dashboard',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        // Refresh from Inventory Button
+                        IconButton(
+                          icon: const Icon(
+                            Icons.sync,
+                            color: Colors.white,
+                          ),
+                          onPressed: () => _showRefreshDialog(context),
+                          tooltip: 'Refresh from Inventory',
+                        ),
+                        // Delete Completed Productions Button
+                        Consumer<ProductionViewModel>(
+                          builder: (context, viewModel, _) {
+                            if (viewModel.hasCompletedProductions()) {
+                              return IconButton(
+                                icon: const Icon(
+                                  Icons.delete_sweep,
+                                  color: Colors.white,
+                                ),
+                                onPressed: () => _showDeleteCompletedDialog(context),
+                                tooltip: 'Delete Completed Productions',
+                              );
+                            }
+                            return const SizedBox.shrink();
+                          },
+                        ),
+                        // Logout Button
+                        IconButton(
+                          icon: const Icon(
+                            Icons.logout,
+                            color: Colors.white,
+                          ),
+                          onPressed: () => _showLogoutDialog(),
+                          tooltip: 'Logout',
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
               // Main Content
               Expanded(
                 child: Container(
-                  margin: const EdgeInsets.all(20),
+                  margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.98),
                     borderRadius: BorderRadius.circular(24),
@@ -732,6 +747,90 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
     return viewModel.productions
         .where((p) => p.productName == selectedFilter)
         .toList();
+  }
+
+  // Add this method to handle refresh from inventory
+  void _showRefreshDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF3B82F6).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                Icons.sync,
+                color: Color(0xFF3B82F6),
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              'Refresh from Inventory',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+        content: const Text(
+          'This will refresh the production list from inventory. Continue?'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                final viewModel = Provider.of<ProductionViewModel>(
+                  context, 
+                  listen: false
+                );
+                Navigator.pop(context);
+                
+                // First cleanup orphaned productions
+                await viewModel.cleanupOrphanedProductions();
+                // Then reload productions
+                await viewModel.loadProductions();
+                
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Production list refreshed successfully'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error refreshing: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF3B82F6),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Refresh'),
+          ),
+        ],
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+      ),
+    );
   }
 }
 

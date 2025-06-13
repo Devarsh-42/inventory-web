@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:visionapp/core/utils/number_formatter.dart';
 import '../../viewmodels/dispatch_viewmodel.dart';
 import '../../models/dispatch.dart';
 
@@ -188,21 +189,89 @@ class _ReadyToShipScreenState extends State<ReadyToShipScreen> {
   }
 
   void _handleShipDispatch(ClientDispatch dispatch) async {
-    final batchNumberController = TextEditingController();
-    final batchQuantityController = TextEditingController();
-    final totalQuantity = dispatch.items.fold<int>(0, (sum, item) => sum + item.quantity);
+    final batchDetailsController = TextEditingController();
+    final totalQuantity = dispatch.items.fold<int>(
+      0, 
+      (sum, item) => sum + item.quantity
+    );
 
-    // Show dialog to get batch number and quantity
-    final result = await showDialog<Map<String, dynamic>>(
+    // Show dialog to get batch details
+    final result = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Ship Orders'),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.green[50],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                Icons.local_shipping,
+                color: Colors.green[600],
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              'Ship Orders',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Items list
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey[200]!),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Items to ship:',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ...dispatch.items.map((item) => Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.circle,
+                          size: 6,
+                          color: Colors.grey[600],
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '${item.productName} (${NumberFormatter.formatQuantity(item.quantity)})',
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
             Text(
-              'Batch Number',
+              'Batch Details',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -211,72 +280,54 @@ class _ReadyToShipScreenState extends State<ReadyToShipScreen> {
             ),
             const SizedBox(height: 8),
             TextField(
-              controller: batchNumberController,
-              decoration: const InputDecoration(
-                hintText: 'Enter batch number',
-                border: OutlineInputBorder(),
+              controller: batchDetailsController,
+              maxLines: 3,
+              decoration: InputDecoration(
+                hintText: 'Enter batch number and quantity details...',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
               autofocus: true,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Batch Quantity (max: $totalQuantity)',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey[700],
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: batchQuantityController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                hintText: 'Enter quantity',
-                border: OutlineInputBorder(),
-              ),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.grey[600],
+            ),
             child: const Text('Cancel'),
           ),
-          TextButton(
+          ElevatedButton.icon(
             onPressed: () {
-              final batchNumber = batchNumberController.text.trim();
-              final quantityText = batchQuantityController.text.trim();
-              final quantity = int.tryParse(quantityText);
-              
-              if (batchNumber.isEmpty) {
+              final details = batchDetailsController.text.trim();
+              if (details.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please enter a batch number')),
+                  const SnackBar(content: Text('Please enter batch details')),
                 );
                 return;
               }
-              
-              if (quantity == null || quantity <= 0 || quantity > totalQuantity) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Please enter a valid quantity (1-$totalQuantity)')),
-                );
-                return;
-              }
-              
-              Navigator.pop(context, {
-                'batchNumber': batchNumber,
-                'quantity': quantity,
-              });
+              Navigator.pop(context, details);
             },
-            child: const Text('OK'),
+            icon: const Icon(Icons.local_shipping, size: 18),
+            label: const Text('Ship'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green[600],
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
           ),
         ],
       ),
     );
 
-    // Dispose controllers
-    batchNumberController.dispose();
-    batchQuantityController.dispose();
+    // Dispose controller
+    batchDetailsController.dispose();
 
     if (result == null) return;
 
@@ -284,22 +335,23 @@ class _ReadyToShipScreenState extends State<ReadyToShipScreen> {
       final dispatchId = dispatch.items.first.dispatchId;
       await context.read<DispatchViewModel>().shipDispatch(
         dispatchId,
-        batchNumber: result['batchNumber'],
-        batchQuantity: result['quantity'],
+        batchDetails: result,
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              'Orders shipped successfully with batch: ${result['batchNumber']} (Qty: ${result['quantity']})'
-            ),
+            content: const Text('Orders shipped successfully'),
+            backgroundColor: Colors.green[600],
           ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red[600],
+          ),
         );
       }
     }

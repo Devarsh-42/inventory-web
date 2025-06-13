@@ -1,6 +1,7 @@
 // screens/production_queue_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:visionapp/core/utils/number_formatter.dart';
 import 'package:visionapp/models/production.dart';
 import 'package:visionapp/view/production/production_bottom_nav.dart';
 import 'package:visionapp/viewmodels/Production_queue_viewModel%20.dart';
@@ -481,7 +482,7 @@ class _ProductionQueueScreenState extends State<ProductionQueueScreen> {
                       Row(
                         children: [
                           Text(
-                            '${item.quantity}/${item.production.targetQuantity}',
+                            '${NumberFormatter.formatQuantity(item.quantity)}/${NumberFormatter.formatQuantity(item.production.targetQuantity)}',
                             style: TextStyle(
                               fontSize: 13,
                               color: Colors.grey.shade700,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:visionapp/repositories/production_completion_repository.dart';
+import 'package:visionapp/view/production/production_dashboard.dart';
 import 'viewmodels/Production_queue_viewModel .dart'; // Add this import
 import 'viewmodels/completed_production_viewmodel.dart';
 import 'viewmodels/dispatch_viewmodel.dart';
@@ -71,6 +72,7 @@ class AppProviders {
       create: (_) => DispatchViewModel(
         repository: DispatchRepository(),
       ),
+      child: const ProductionDashboardScreen(),
     ),
   ];
 }

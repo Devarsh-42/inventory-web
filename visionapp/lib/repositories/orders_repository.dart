@@ -75,10 +75,11 @@ class OrdersRepository {
 
   Future<void> updateOrderStatus(String orderId, OrderStatus status) async {
     try {
+      final statusStr = status.toString().split('.').last.toLowerCase();
       await _supabaseService.client
-          .from(_tableName)
+          .from('orders')
           .update({
-            'status': status.toString().split('.').last,
+            'status': statusStr,
             'updated_at': DateTime.now().toIso8601String(),
           })
           .eq('id', orderId);

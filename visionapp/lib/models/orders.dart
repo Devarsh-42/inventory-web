@@ -103,6 +103,22 @@ class Order {
       specialInstructions: specialInstructions ?? this.specialInstructions,
     );
   }
+
+  Map<String, int> get groupedProducts {
+    final Map<String, int> grouped = {};
+    for (var product in products) {
+      grouped[product.name] = (grouped[product.name] ?? 0) + product.quantity;
+    }
+    return grouped;
+  }
+
+  Map<String, int> get groupedCompletedProducts {
+    final Map<String, int> grouped = {};
+    for (var product in products) {
+      grouped[product.name] = (grouped[product.name] ?? 0) + product.completed;
+    }
+    return grouped;
+  }
 }
 
 class ProductItem {
@@ -140,6 +156,8 @@ enum OrderStatus {
   inProduction,
   completed,
   paused,
+  ready,    // Add ready status
+  shipped   // Add shipped status
 }
 
 enum Priority {

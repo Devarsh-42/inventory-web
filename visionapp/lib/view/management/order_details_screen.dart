@@ -456,6 +456,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         return 'Completed';
       case OrderStatus.paused:
         return 'Paused';
+      case OrderStatus.ready:
+        return 'Ready';
+      case OrderStatus.shipped:
+        return 'Shipped';
     }
   }
 

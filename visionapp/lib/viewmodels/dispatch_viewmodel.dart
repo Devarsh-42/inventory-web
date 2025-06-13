@@ -21,6 +21,12 @@ class DispatchViewModel extends ChangeNotifier {
     }).toList();
   }
 
+  Map<String, int> _productInventory = {};
+  int _totalInventory = 0;
+
+  Map<String, int> get productInventory => _productInventory;
+  int get totalInventory => _totalInventory;
+
   Future<void> loadDispatchItems() async {
     try {
       _isLoading = true;
@@ -47,6 +53,18 @@ class DispatchViewModel extends ChangeNotifier {
     }
   }
 
+  Future<void> loadInventory() async {
+    try {
+      final response = await _repository.getInventoryStatus();
+      _productInventory = response['products'];
+      _totalInventory = response['total'];
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+    }
+  }
+
   Future<void> markItemAsReady(String itemId) async {
     try {
       _isLoading = true;
@@ -67,20 +85,11 @@ class DispatchViewModel extends ChangeNotifier {
 
   Future<void> shipDispatch(
     String dispatchId, {
-    String? batchNumber,
-    int? batchQuantity,
+    String? batchDetails,  // Changed from batchNumber/batchQuantity
   }) async {
     try {
       if (dispatchId.isEmpty) {
         throw Exception('Invalid dispatch ID');
-      }
-
-      // Validate batch data consistency
-      final hasBatchNumber = batchNumber?.isNotEmpty ?? false;
-      final hasBatchQuantity = batchQuantity != null && batchQuantity > 0;
-
-      if (hasBatchNumber != hasBatchQuantity) {
-        throw Exception('Both batch number and quantity must be provided together');
       }
 
       _isLoading = true;
@@ -89,11 +98,11 @@ class DispatchViewModel extends ChangeNotifier {
 
       await _repository.shipDispatch(
         dispatchId,
-        batchNumber: hasBatchNumber ? batchNumber : null,
-        batchQuantity: hasBatchQuantity ? batchQuantity : null,
+        batchDetails: batchDetails,  // Pass the combined details
       );
       
       await loadDispatchItems();
+      await loadInventory();
 
       _isLoading = false;
       notifyListeners();

@@ -4,6 +4,7 @@ import 'package:visionapp/provider.dart';
 import 'package:visionapp/view/auth/login_screen.dart';
 import 'package:visionapp/view/production/production_dashboard.dart';
 import 'package:visionapp/view/admin/admin_dashboard.dart';
+import 'package:visionapp/view/sales/sales_dashboard.dart';
 import 'core/services/supabase_services.dart';
 
 void main() async {

@@ -521,6 +521,14 @@ class _OrdersManagementScreenState extends State<OrdersManagementScreen> {
         backgroundColor = const Color(0xFFD97706);
         text = 'PAUSED';
         break;
+      case OrderStatus.ready:
+        backgroundColor = const Color(0xFF16A34A);
+        text = 'READY FOR PICKUP';
+        break;
+      case OrderStatus.shipped:
+        backgroundColor = const Color(0xFF16A34A);
+        text = 'Shipped';
+        break;
     }
 
     return Container(
@@ -734,6 +742,10 @@ class _OrdersManagementScreenState extends State<OrdersManagementScreen> {
         return 'Completed';
       case OrderStatus.paused:
         return 'Paused';
+      case OrderStatus.ready:
+        return 'Ready';
+      case OrderStatus.shipped:
+        return 'Shipped';
     }
   }
 

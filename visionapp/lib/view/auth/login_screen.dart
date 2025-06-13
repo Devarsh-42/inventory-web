@@ -30,13 +30,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _login() async {
     if (_formKey.currentState!.validate()) {
-      final email = _companyIdController.text.trim();
+      final userId = _companyIdController.text.trim();
+      final email = '$userId@gmail.com';  // Append @gmail.com
       final password = _passwordController.text.trim();
 
       try {
         // Sign in with Supabase
         final response = await Supabase.instance.client.auth.signInWithPassword(
-          email: email,
+          email: email,  // Use modified email
           password: password,
         );
 
@@ -45,7 +46,7 @@ class _LoginScreenState extends State<LoginScreen> {
           final userData = await Supabase.instance.client
               .from('users')
               .select('role')
-              .eq('email', email)
+              .eq('email', email)  // Use modified email
               .single();
 
           if (!mounted) return;
@@ -147,7 +148,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Company ID', 
+                              'User ID',  // Changed from 'Company ID'
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
@@ -158,7 +159,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             TextFormField(
                               controller: _companyIdController,
                               decoration: InputDecoration(
-                                hintText: 'Enter your company ID',
+                                hintText: 'Enter your user ID',  // Changed from 'Enter your company ID'
                                 hintStyle: TextStyle(color: Palette.tertiaryTextColor),
                                 fillColor: Palette.surfaceGray,
                                 filled: true,
@@ -180,7 +181,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               ),
                               validator: (value) => value == null || value.isEmpty 
-                                ? 'Please enter your company ID' 
+                                ? 'Please enter your user ID'  // Changed from 'Please enter your company ID'
                                 : null,
                             ),
                           ],

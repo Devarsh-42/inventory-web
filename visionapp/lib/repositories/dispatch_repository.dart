@@ -227,8 +227,7 @@ class DispatchRepository {
   // Update the shipDispatch method
   Future<void> shipDispatch(
     String dispatchId, {
-    String? batchNumber,
-    int? batchQuantity,
+    String? batchDetails,  // Changed parameter
   }) async {
     try {
       final now = DateTime.now().toIso8601String();
@@ -248,13 +247,8 @@ class DispatchRepository {
       Map<String, dynamic> dispatchUpdate = {
         'status': 'shipped',
         'shipped_on': now,
+        'shipping_notes': batchDetails,  // Store batch details in shipping_notes
       };
-
-      // Add batch data if provided
-      if (batchNumber?.isNotEmpty == true && batchQuantity != null && batchQuantity > 0) {
-        dispatchUpdate['batch_number'] = batchNumber;
-        dispatchUpdate['batch_quantity'] = batchQuantity;
-      }
 
       // Update dispatch status first
       await _supabaseService.client
@@ -270,6 +264,7 @@ class DispatchRepository {
             'shipped_date': now,
             'is_ready': true,
             'ready': true,
+            'shipping_notes': batchDetails,  // Also store in items
           })
           .eq('dispatch_id', dispatchId);
 
@@ -312,6 +307,53 @@ class DispatchRepository {
     } catch (e) {
       print('Error deleting shipped dispatch: $e');
       throw Exception('Failed to delete shipped dispatch: $e');
+    }
+  }
+
+  // Add to DispatchRepository class
+  Future<Map<String, dynamic>> getInventoryStatus() async {
+    try {
+      // Get all completed productions that aren't shipped
+      final completedProds = await _supabaseService.client
+          .from('production_completions')
+          .select('product_name, quantity_completed, shipped')
+          .eq('shipped', false);
+
+      // Get all shipped dispatch items to subtract from total
+      final shippedItems = await _supabaseService.client
+          .from('dispatch_items')
+          .select('product_name, quantity')
+          .eq('shipped', true);
+
+      final Map<String, int> products = {};
+      int total = 0;
+
+      // Add completed productions
+      for (var prod in completedProds) {
+        final productName = prod['product_name'];
+        final quantity = prod['quantity_completed'] as int;
+        
+        products[productName] = (products[productName] ?? 0) + quantity;
+        total += quantity;
+      }
+
+      // Subtract shipped quantities
+      for (var item in shippedItems) {
+        final productName = item['product_name'];
+        final quantity = item['quantity'] as int;
+        
+        if (products.containsKey(productName)) {
+          products[productName] = (products[productName] ?? 0) - quantity;
+          total -= quantity;
+        }
+      }
+
+      return {
+        'products': products,
+        'total': total,
+      };
+    } catch (e) {
+      throw Exception('Failed to get inventory status: $e');
     }
   }
 }

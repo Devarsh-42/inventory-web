@@ -457,6 +457,14 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         return const LinearGradient(
           colors: [Color(0xFFDC2626), Color(0xFFEF4444)]
         );
+      case OrderStatus.ready:
+        return const LinearGradient(
+          colors: [Color(0xFF7C3AED), Color(0xFF8B5CF6)]
+        );
+      case OrderStatus.shipped:
+        return const LinearGradient(
+          colors: [Color(0xFF059669), Color(0xFF10B981)]
+        );
     }
   }
 
@@ -470,6 +478,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         return 'Completed';
       case OrderStatus.paused:
         return 'Paused';
+      case OrderStatus.ready:
+        return 'Ready';
+      case OrderStatus.shipped:
+        return 'Shipped';
     }
   }
 

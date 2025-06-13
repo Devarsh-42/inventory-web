@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:visionapp/core/services/supabase_services.dart';
+import 'package:visionapp/core/utils/number_formatter.dart';
+import 'package:visionapp/core/utils/responsive_helper.dart';
+import 'package:visionapp/view/admin/production_management_screen.dart';
 import 'package:visionapp/view/auth/login_screen.dart';
 import 'package:visionapp/view/production/add_product_screen.dart';
 import 'package:visionapp/view/production/production_bottom_nav.dart';
@@ -10,6 +13,7 @@ import 'package:visionapp/view/production/production_queue_management_screen.dar
 import 'package:visionapp/view/production/ready_to_ship_screen.dart';
 import 'package:visionapp/view/production/dispatch_screen.dart'; // Import DispatchScreen
 import 'package:visionapp/viewmodels/completed_production_viewmodel.dart';
+import 'package:visionapp/widgets/inventory_status_widget.dart';
 import '../../viewmodels/production_viewmodel.dart';
 import '../../viewmodels/dispatch_viewmodel.dart';
 import '../../repositories/dispatch_repository.dart';
@@ -30,8 +34,11 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final viewModel = Provider.of<ProductionViewModel>(context, listen: false);
+      final dispatchViewModel = Provider.of<DispatchViewModel>(context, listen: false);
+      
       viewModel.loadProductions();
-      viewModel.loadProductNames(); // Add this line
+      viewModel.loadProductNames();
+      dispatchViewModel.loadInventory(); // Add this line
     });
   }
 
@@ -281,103 +288,130 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
   }
 
   Widget _buildStatsGrid(ProductionViewModel viewModel) {
-    final stats = viewModel.stats;
-    final inProgressCount = viewModel.getProductionsByStatus('in-progress').length;
-    final completedCount = viewModel.getProductionsByStatus('completed').length;
-
-    return Row(
-      children: [
-        Expanded(
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF1E40AF), Color(0xFF3B82F6)],
+    bool isMobile = ResponsiveHelper.isMobile(context);
+    
+    return Container(
+      height: 180, // Fixed height to prevent overflow
+      child: isMobile 
+        ? Column(
+            children: [
+              Expanded(child: _buildInventoryStatus()),
+              const SizedBox(height: 16),
+              _buildStatCards(viewModel),
+            ],
+          )
+        : Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch, // Make children fill height
+            children: [
+              Expanded(
+                flex: 7, // Increase flex for inventory status
+                child: _buildInventoryStatus(),
               ),
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF1E40AF).withOpacity(0.2),
-                  blurRadius: 8,
-                  offset: const Offset(0, 8),
-                ),
-              ],
+              const SizedBox(width: 16),
+              Expanded(
+                flex: 3, // Decrease flex for stat cards
+                child: _buildStatCards(viewModel),
+              ),
+            ],
+          ),
+    );
+  }
+
+  Widget _buildInventoryStatus() {
+    return Consumer<DispatchViewModel>(
+      builder: (context, dispatchViewModel, _) {
+        return InventoryStatusWidget(
+          productQuantities: dispatchViewModel.productInventory,
+          totalQuantity: dispatchViewModel.totalInventory,
+        );
+      },
+    );
+  }
+
+  Widget _buildStatCards(ProductionViewModel viewModel) {
+    return Column(
+      mainAxisSize: MainAxisSize.min, // Take minimum required space
+      children: [
+        Flexible(
+          child: _buildStatCard(
+            title: 'IN PRODUCTION',
+            value: viewModel.getProductionsByStatus('in-progress').length,
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF1E40AF), Color(0xFF3B82F6)],
             ),
-            child: Column(
-              children: [
-                Text(
-                  '${stats['total_active'] ?? inProgressCount}',
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'IN PRODUCTION',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ],
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const ProductionManagementScreen(),
+              ),
             ),
           ),
         ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: GestureDetector(
-            onTap: _handleReadyToShipNavigation,  // Updated to use the new method
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xFF1E40AF), Color(0xFF3B82F6)],
-                ),
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF1E40AF).withOpacity(0.2),
-                    blurRadius: 8,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    '$completedCount',
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'READY TO SHIP',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ],
-              ),
+        const SizedBox(height: 12),
+        Flexible(
+          child: _buildStatCard(
+            title: 'READY TO SHIP',
+            value: viewModel.getProductionsByStatus('completed').length,
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF059669), Color(0xFF10B981)],
             ),
+            onTap: _handleReadyToShipNavigation,
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildStatCard({
+    required String title,
+    required int value,
+    required LinearGradient gradient,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: gradient,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: gradient.colors.first.withOpacity(0.2),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              NumberFormatter.formatQuantity(value),
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+                letterSpacing: -0.5,
+              ),
+            ),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

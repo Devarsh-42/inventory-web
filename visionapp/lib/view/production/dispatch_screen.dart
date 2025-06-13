@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:visionapp/core/utils/number_formatter.dart';
+import 'package:visionapp/widgets/inventory_status_widget.dart';
 import '../../viewmodels/dispatch_viewmodel.dart';
 import '../../models/dispatch.dart';
 import 'production_bottom_nav.dart';
@@ -12,19 +14,22 @@ class DispatchScreen extends StatefulWidget {
 }
 
 class _DispatchScreenState extends State<DispatchScreen> {
-  final TextEditingController _batchNumberController = TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<DispatchViewModel>().loadDispatchItems();
+      final viewModel = context.read<DispatchViewModel>();
+      viewModel.loadDispatchItems();
+      viewModel.loadInventory();
     });
   }
 
   @override
   void dispose() {
-    _batchNumberController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -45,24 +50,55 @@ class _DispatchScreenState extends State<DispatchScreen> {
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
-      body: Container(
-        margin: const EdgeInsets.only(top: 8),
-        decoration: const BoxDecoration(
-          color: Color(0xFFF8FAFC),
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(24),
-            topRight: Radius.circular(24),
+      body: Column(
+        children: [
+          _buildInventoryStatus(),
+          _buildSearchBar(),
+          Expanded(
+            child: _buildContent(),
           ),
-        ),
-        child: _buildContent(),
+        ],
       ),
       bottomNavigationBar: const ProductionBottomNav(currentRoute: '/dispatch'),
     );
   }
 
+  Widget _buildInventoryStatus() {
+    return Consumer<DispatchViewModel>(
+      builder: (context, viewModel, _) {
+        return InventoryStatusWidget(
+          productQuantities: viewModel.productInventory,
+          totalQuantity: viewModel.totalInventory,
+          isExpanded: false, // Set to false for dispatch screen
+        );
+      },
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: TextField(
+        controller: _searchController,
+        decoration: InputDecoration(
+          hintText: 'Search by client or product...',
+          prefixIcon: const Icon(Icons.search),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        onChanged: (value) {
+          setState(() {
+            _searchQuery = value.toLowerCase();
+          });
+        },
+      ),
+    );
+  }
+
   Widget _buildContent() {
     return Consumer<DispatchViewModel>(
-      builder: (context, viewModel, child) {
+      builder: (context, viewModel, _) {
         if (viewModel.isLoading) {
           return Center(
             child: Column(
@@ -192,13 +228,33 @@ class _DispatchScreenState extends State<DispatchScreen> {
           );
         }
 
+        final filteredItems = viewModel.dispatchItems.where((dispatch) {
+          return dispatch.clientName.toLowerCase().contains(_searchQuery) ||
+                 dispatch.items.any((item) => 
+                     item.productName.toLowerCase().contains(_searchQuery));
+        }).toList();
+
         return RefreshIndicator(
           onRefresh: () async => viewModel.loadDispatchItems(),
-          child: ListView.builder(
+          child: ReorderableListView.builder(
             padding: const EdgeInsets.all(16),
-            itemCount: viewModel.dispatchItems.length,
-            itemBuilder: (context, index) =>
-                _buildClientDispatchCard(viewModel.dispatchItems[index]),
+            itemCount: filteredItems.length,
+            onReorder: (oldIndex, newIndex) {
+              setState(() {
+                if (oldIndex < newIndex) {
+                  newIndex -= 1;
+                }
+                final item = filteredItems.removeAt(oldIndex);
+                filteredItems.insert(newIndex, item);
+              });
+            },
+            itemBuilder: (context, index) {
+              final dispatch = filteredItems[index];
+              return Container(
+                key: ValueKey('dispatch_${dispatch.dispatchId}'), // Add unique key here
+                child: _buildClientDispatchCard(dispatch),
+              );
+            },
           ),
         );
       },
@@ -553,8 +609,7 @@ class _DispatchScreenState extends State<DispatchScreen> {
   }
 
   void _handleShipOrder(ClientDispatch dispatch) {
-    final batchNumberController = TextEditingController();
-    final batchQuantityController = TextEditingController();
+    final batchDetailsController = TextEditingController();
     final totalQuantity = dispatch.items.fold<int>(0, (sum, item) => sum + item.quantity);
     
     showDialog(
@@ -633,7 +688,7 @@ class _DispatchScreenState extends State<DispatchScreen> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              '${item.productName} (${item.quantity})',
+                              '${item.productName} (${NumberFormatter.formatQuantity(item.quantity)})',
                               style: const TextStyle(fontSize: 14),
                             ),
                           ),
@@ -646,9 +701,9 @@ class _DispatchScreenState extends State<DispatchScreen> {
               
               const SizedBox(height: 20),
               
-              // Batch number input
+              // Combined batch details input
               Text(
-                'Batch Number',
+                'Batch Details',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -657,30 +712,10 @@ class _DispatchScreenState extends State<DispatchScreen> {
               ),
               const SizedBox(height: 8),
               TextField(
-                controller: batchNumberController,
+                controller: batchDetailsController,
+                maxLines: 3,
                 decoration: InputDecoration(
-                  hintText: 'Enter batch number',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-              
-              const SizedBox(height: 20),
-              Text(
-                'Batch Quantity (max: $totalQuantity)',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey[700],
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: batchQuantityController,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  hintText: 'Enter quantity',
+                  hintText: 'Enter batch number and quantity details...',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -703,59 +738,12 @@ class _DispatchScreenState extends State<DispatchScreen> {
           ),
           ElevatedButton.icon(
             onPressed: () async {
-              final batchNumber = batchNumberController.text.trim();
-              final quantityText = batchQuantityController.text.trim();
-              // 
-              // If both fields are empty, proceed without batch data
-              if (batchNumber.isEmpty && quantityText.isEmpty) {
-                try {
-                  await context.read<DispatchViewModel>().shipDispatch(
-                    dispatch.items.first.dispatchId,
-                  );
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: const Text('Order shipped successfully'),
-                      backgroundColor: Colors.green[600],
-                    ),
-                  );
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Error: $e'),
-                      backgroundColor: Colors.red[600],
-                    ),
-                  );
-                }
-                return;
-              }
-
-              // If either field is filled, both must be filled
-              if (batchNumber.isEmpty || quantityText.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Please provide both batch number and quantity or leave both empty'),
-                  ),
-                );
-                return;
-              }
-
-              // Parse and validate quantity
-              final quantity = int.tryParse(quantityText);
-              if (quantity == null || quantity <= 0 || quantity > totalQuantity) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Please enter a valid quantity (1-$totalQuantity)'),
-                  ),
-                );
-                return;
-              }
-
+              final batchDetails = batchDetailsController.text.trim();
+              
               try {
                 await context.read<DispatchViewModel>().shipDispatch(
                   dispatch.items.first.dispatchId,
-                  batchNumber: batchNumber,
-                  batchQuantity: quantity,
+                  batchDetails: batchDetails,
                 );
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(

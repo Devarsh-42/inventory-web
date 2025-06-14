@@ -392,7 +392,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           ),
           Expanded(
             child: _buildTabButton(
-              title: 'Ready for Pickup',
+              title: 'Ready',
               isSelected: _selectedOrderTab == 1,
               onTap: () => setState(() => _selectedOrderTab = 1),
             ),
@@ -540,7 +540,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           children: [
             Expanded(
               child: Text(
-                'Ready for Pickup',
+                'Ready',
                 style: TextStyle(
                   color: const Color(0xFF1F2937),
                   fontSize: isMobile ? 18 : 20,
@@ -597,15 +597,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     final isMobile = ResponsiveHelper.isMobile(context);
     
     // Get priority color
-    Color priorityColor;
-    switch (order.priority) {
-      case Priority.normal:
-        priorityColor = const Color(0xFFDC2626);
-      case Priority.high:
-        priorityColor = const Color(0xFFFACC15);
-      case Priority.urgent:
-        priorityColor = const Color(0xFF22C55E);
-    }
+    Color priorityColor = _getPriorityColor(order.priority);
 
     return InkWell(
       onTap: () => _onOrderCardTap(order),
@@ -625,15 +617,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
         ),
         child: Stack(
           children: [
-            if (order.priority != Priority.normal)
-              Positioned(
-                top: 0,
-                right: 0,
-                child: CustomPaint(
-                  size: Size(isMobile ? 25 : 30, isMobile ? 25 : 30),
-                  painter: TrianglePainter(color: priorityColor),
-                ),
-              ),
             Padding(
               padding: EdgeInsets.all(isMobile ? 14 : 18),
               child: Column(
@@ -649,33 +632,95 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             Text(
                               '${order.clientName} #${order.displayId}',
                               style: TextStyle(
-                                color: const Color(0xFF111827),
                                 fontSize: isMobile ? 14 : 16,
                                 fontWeight: FontWeight.bold,
-                                letterSpacing: -0.2,
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '${order.products.length} Products • Due ${_formatDate(order.dueDate)}',
+                              'Due ${_formatDate(order.dueDate)}',
                               style: TextStyle(
-                                color: const Color(0xFF6B7280),
+                                color: Colors.grey[600],
                                 fontSize: isMobile ? 12 : 14,
-                                fontWeight: FontWeight.w500,
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),
                       ),
                     ],
                   ),
-                  SizedBox(height: isMobile ? 12 : 14),
-                  _buildStatusBadge(order.status),
+                  const SizedBox(height: 12),
+                  // Products List
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey[200]!),
+                    ),
+                    padding: const EdgeInsets.all(8),
+                    child: Column(
+                      children: order.products.map((product) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                product.name,
+                                style: TextStyle(
+                                  fontSize: isMobile ? 12 : 14,
+                                  color: Colors.grey[800],
+                                ),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.blue[50],
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                '${product.completed}/${product.quantity}',
+                                style: TextStyle(
+                                  fontSize: isMobile ? 11 : 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.blue[700],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )).toList(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildStatusBadge(order.status),
+                      Text(
+                        'Total: ${order.totalUnits} units',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: isMobile ? 11 : 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
+              ),
+            ),
+            // Priority indicator
+            Positioned(
+              top: 0,
+              right: 0,
+              child: CustomPaint(
+                painter: TrianglePainter(color: priorityColor),
+                size: Size(isMobile ? 25 : 30, isMobile ? 25 : 30),
               ),
             ),
           ],
@@ -691,25 +736,17 @@ class _AdminDashboardState extends State<AdminDashboard> {
     String text;
 
     switch (status) {
-      case OrderStatus.inProduction:
+      case OrderStatus.in_production:
         backgroundColor = const Color(0xFF059669);
         text = 'IN PRODUCTION';
-        break;
-      case OrderStatus.queued:
-        backgroundColor = const Color(0xFF1E40AF);
-        text = 'QUEUED';
         break;
       case OrderStatus.completed:
         backgroundColor = const Color(0xFF4B5563);
         text = 'COMPLETED';
         break;
-      case OrderStatus.paused:
-        backgroundColor = const Color(0xFFD97706);
-        text = 'PAUSED';
-        break;
       case OrderStatus.ready:
         backgroundColor = const Color(0xFF16A34A);
-        text = 'READY FOR PICKUP';
+        text = 'READY';
         break;
       case OrderStatus.shipped:
         backgroundColor = const Color(0xFF16A34A);
@@ -840,6 +877,19 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}/${date.year}';
+  }
+
+  Color _getPriorityColor(Priority priority) {
+    switch (priority) {
+      case Priority.normal:
+        return const Color(0xFFDC2626);
+      case Priority.high:
+        return const Color(0xFFFACC15);
+      case Priority.urgent:
+        return const Color(0xFF22C55E);
+      default:
+        return const Color(0xFFDC2626);
+    }
   }
 }
 

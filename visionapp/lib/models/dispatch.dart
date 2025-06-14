@@ -5,21 +5,18 @@ class DispatchItem {
   final String? completedProductionId;
   final String productName;
   final int quantity;
-  final bool isReady;  // This matches the database column name
-  final bool ready;    // This is the additional field
+  final bool isReady;
+  final bool ready;
   final DateTime? readyDate;
-  final bool shipped;  // Changed from nullable
+  final bool shipped;
   final DateTime? shippedDate;
   final String? shippingNotes;
   final DateTime createdAt;
   final DateTime updatedAt;
-  // Add dispatch-related fields
   final String clientId;
-  final String clientName;  // Add this field
+  final String clientName;
   final String? dispatchStatus;
   final DateTime? dispatchDate;
-  final String? batchNumber;  // Add this field
-  final int? batchQuantity;  // Add this field
 
   DispatchItem({
     required this.id,
@@ -31,15 +28,13 @@ class DispatchItem {
     required this.productName,
     required this.quantity,
     this.isReady = false,
-    this.ready = false,    // Add this field
+    this.ready = false,
     this.readyDate,
-    this.shipped = false,  // Default to false instead of null
+    this.shipped = false,
     this.shippedDate,
     this.shippingNotes,
     this.dispatchStatus,
     this.dispatchDate,
-    this.batchNumber,  // Add this parameter
-    this.batchQuantity,  // Add this parameter
     required this.createdAt,
     required this.updatedAt,
   });
@@ -71,8 +66,6 @@ class DispatchItem {
       dispatchDate: dispatch['dispatch_date'] != null 
           ? DateTime.parse(dispatch['dispatch_date']) 
           : null,
-      batchNumber: dispatch['batch_number'],
-      batchQuantity: dispatch['batch_quantity'],
       createdAt: DateTime.parse(json['created_at']),
       updatedAt: DateTime.parse(json['updated_at']),
     );
@@ -91,8 +84,6 @@ class ClientDispatch {
   final String? trackingNumber;
   final DateTime? shippedOn;
   final String? shippingNotes;
-  final String? batchNumber;
-  final int? batchQuantity;  // Add this field
 
   ClientDispatch({
     required this.dispatchId,
@@ -104,8 +95,6 @@ class ClientDispatch {
     this.trackingNumber,
     this.shippedOn,
     this.shippingNotes,
-    this.batchNumber,
-    this.batchQuantity,  // Add this parameter
   });
 
   factory ClientDispatch.fromItems(String dispatchId, List<DispatchItem> items) {
@@ -120,8 +109,9 @@ class ClientDispatch {
         items.every((item) => item.isReady) ? 'ready' : 'pending'
       ),
       dispatchDate: firstItem.dispatchDate,
-      batchNumber: firstItem.batchNumber,
-      batchQuantity: firstItem.batchQuantity,  // Add this field
+      trackingNumber: firstItem.dispatchStatus == 'shipped' ? firstItem.shippingNotes : null,
+      shippedOn: firstItem.shippedDate,
+      shippingNotes: firstItem.shippingNotes,
     );
   }
 
@@ -129,4 +119,28 @@ class ClientDispatch {
     status != 'shipped' && 
     status != 'delivered' && 
     items.every((item) => item.isReady);
+
+  // Total quantity across all items
+  int get totalQuantity => 
+    items.fold(0, (sum, item) => sum + item.quantity);
+
+  // Count of ready items
+  int get readyItemsCount => 
+    items.where((item) => item.isReady).length;
+
+  // Count of shipped items
+  int get shippedItemsCount => 
+    items.where((item) => item.shipped).length;
+
+  // Status text with counts
+  String get statusWithCounts {
+    switch (status) {
+      case 'shipped':
+        return 'Shipped ($shippedItemsCount/${items.length} items)';
+      case 'ready':
+        return 'Ready ($readyItemsCount/${items.length} items)';
+      default:
+        return 'Pending ($readyItemsCount/${items.length} ready)';
+    }
+  }
 }

@@ -3,58 +3,57 @@ import 'package:uuid/uuid.dart';
 
 class Production {
   final String id;
+  final String productName;
   final int targetQuantity;
   final int completedQuantity;
   final String status;
   final DateTime createdAt;
-  final DateTime updatedAt;
   final String? orderId;
-  final String productName;
-  final int availableQuantity;
+  final Map<String, dynamic>? orderDetails;
+  final int availableQuantity; // Add this field
 
   double get progress => completedQuantity / targetQuantity;
   bool get isCompleted => status == 'completed';
 
   Production({
     String? id,
+    required this.productName,
     required this.targetQuantity,
     this.completedQuantity = 0,
     required this.status,
     DateTime? createdAt,
-    DateTime? updatedAt,
     this.orderId,
-    required this.productName,
-    int? availableQuantity,
+    this.orderDetails,
+    this.availableQuantity = 0, // Add default value
   }) : 
     this.id = id ?? const Uuid().v4(),
-    this.createdAt = createdAt ?? DateTime.now(),
-    this.updatedAt = updatedAt ?? DateTime.now(),
-    this.availableQuantity = availableQuantity ?? targetQuantity;
+    this.createdAt = createdAt ?? DateTime.now();
 
   factory Production.fromJson(Map<String, dynamic> json) {
     return Production(
       id: json['id'],
+      productName: json['product_name'] ?? '',
       targetQuantity: json['target_quantity'] ?? 0,
       completedQuantity: json['completed_quantity'] ?? 0,
       status: json['status'] ?? 'pending',
       createdAt: DateTime.parse(json['created_at']),
-      updatedAt: DateTime.parse(json['updated_at']),
       orderId: json['order_id'],
-      productName: json['product_name'] ?? '',
-      availableQuantity: json['available_quantity'] ?? json['target_quantity'] ?? 0,
+      orderDetails: json['order_details'],
+      availableQuantity: json['available_quantity'] ?? 0, // Add this field
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'product_name': productName,
       'target_quantity': targetQuantity,
       'completed_quantity': completedQuantity,
       'status': status,
       'created_at': createdAt.toIso8601String(),
-      'updated_at': updatedAt.toIso8601String(),
       'order_id': orderId,
-      'product_name': productName,
+      'order_details': orderDetails,
+      'available_quantity': availableQuantity, // Add this field
     };
   }
 
@@ -69,25 +68,25 @@ class Production {
 
   Production copyWith({
     String? id,
+    String? productName,
     int? targetQuantity,
     int? completedQuantity,
     String? status,
     DateTime? createdAt,
-    DateTime? updatedAt,
     String? orderId,
-    String? productName,
-    int? availableQuantity,
+    Map<String, dynamic>? orderDetails,
+    int? availableQuantity, // Add this parameter
   }) {
     return Production(
       id: id ?? this.id,
+      productName: productName ?? this.productName,
       targetQuantity: targetQuantity ?? this.targetQuantity,
       completedQuantity: completedQuantity ?? this.completedQuantity,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
       orderId: orderId ?? this.orderId,
-      productName: productName ?? this.productName,
-      availableQuantity: availableQuantity ?? this.availableQuantity,
+      orderDetails: orderDetails ?? this.orderDetails,
+      availableQuantity: availableQuantity ?? this.availableQuantity, // Add this field
     );
   }
 }

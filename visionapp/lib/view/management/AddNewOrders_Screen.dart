@@ -877,7 +877,7 @@ class _AddOrderScreenState extends State<AddOrderScreen> {
         products: _orderProducts,
         dueDate: _selectedDueDate!,
         createdDate: widget.orderToEdit?.createdDate ?? DateTime.now(),
-        status: widget.orderToEdit?.status ?? OrderStatus.queued,
+        status: widget.orderToEdit?.status ?? OrderStatus.in_production,
         priority: _selectedPriority,
         specialInstructions: _specialInstructionsController.text.isEmpty
             ? null

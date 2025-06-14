@@ -15,17 +15,40 @@ class DispatchViewModel extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   
-  List<ClientDispatch> get dispatchItems {
+  // Rename dispatchItems to groupedDispatchItems for clarity
+  List<ClientDispatch> get groupedDispatchItems {
     return _groupedItems.entries.map((entry) {
       return ClientDispatch.fromItems(entry.key, entry.value);
-    }).toList();
+    }).toList()
+      ..sort((a, b) {
+        // Sort by status: pending -> ready -> shipped
+        final statusOrder = {
+          'shipped': 2,
+          'ready': 1,
+          'pending': 0
+        };
+        final statusCompare = (statusOrder[b.status] ?? 0)
+            .compareTo(statusOrder[a.status] ?? 0);
+        if (statusCompare != 0) return statusCompare;
+        
+        // Then by client name
+        return a.clientName.compareTo(b.clientName);
+      });
   }
 
   Map<String, int> _productInventory = {};
   int _totalInventory = 0;
 
-  Map<String, int> get productInventory => _productInventory;
-  int get totalInventory => _totalInventory;
+  Map<String, int> get productInventory {
+    final inventory = <String, int>{};
+    for (var item in _items) {
+      inventory[item.productName] = (inventory[item.productName] ?? 0) + item.quantity;
+    }
+    return inventory;
+  }
+
+  int get totalInventory => 
+    productInventory.values.fold(0, (sum, quantity) => sum + quantity);
 
   Future<void> loadDispatchItems() async {
     try {
@@ -65,13 +88,13 @@ class DispatchViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> markItemAsReady(String itemId) async {
+  Future<void> markItemAsReady(String itemId, String batchDetails) async {
     try {
       _isLoading = true;
       _error = null;
       notifyListeners();
 
-      await _repository.markItemReady(itemId);
+      await _repository.markItemReady(itemId, batchDetails);
       await loadDispatchItems();
 
       _isLoading = false;
@@ -85,7 +108,7 @@ class DispatchViewModel extends ChangeNotifier {
 
   Future<void> shipDispatch(
     String dispatchId, {
-    String? batchDetails,  // Changed from batchNumber/batchQuantity
+    required String shipmentDetails,
   }) async {
     try {
       if (dispatchId.isEmpty) {
@@ -98,7 +121,7 @@ class DispatchViewModel extends ChangeNotifier {
 
       await _repository.shipDispatch(
         dispatchId,
-        batchDetails: batchDetails,  // Pass the combined details
+        shipmentDetails: shipmentDetails,
       );
       
       await loadDispatchItems();
@@ -114,15 +137,14 @@ class DispatchViewModel extends ChangeNotifier {
     }
   }
 
-  // Add this method to DispatchViewModel class
-  Future<void> deleteShippedDispatch(String dispatchId) async {
+  Future<void> deleteDispatch(String dispatchId) async {
     try {
       _isLoading = true;
       _error = null;
       notifyListeners();
 
-      await _repository.deleteShippedDispatch(dispatchId);
-      await loadDispatchItems(); // Refresh the list after deletion
+      await _repository.deleteDispatch(dispatchId);
+      await loadDispatchItems();
 
       _isLoading = false;
       notifyListeners();
@@ -130,7 +152,46 @@ class DispatchViewModel extends ChangeNotifier {
       _error = e.toString();
       _isLoading = false;
       notifyListeners();
-      throw e; // Re-throw to handle in UI
+      throw e;
+    }
+  }
+
+  Future<void> deleteShippedItems(String dispatchId) async {
+    try {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      await _repository.deleteShippedItems(dispatchId);
+      await loadDispatchItems();
+
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      throw e;
+    }
+  }
+
+  Future<void> deleteShippedDispatch(String dispatchId) async {
+    try {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      await _repository.deleteShippedDispatch(dispatchId);
+      await loadDispatchItems();
+      await loadInventory(); // Reload inventory after deletion
+
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      throw e; // Re-throw for UI handling
     }
   }
 }

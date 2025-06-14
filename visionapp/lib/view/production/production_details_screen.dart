@@ -21,14 +21,17 @@ class ProductDetailsScreen extends StatefulWidget {
 class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   late TextEditingController _completedController;
   late String _status;
+  bool get _isReadOnly => ['ready', 'completed', 'shipped'].contains(_status.toLowerCase());
 
   @override
   void initState() {
     super.initState();
-    _completedController = TextEditingController(
-      text: widget.production.completedQuantity.toString()
-    );
     _status = widget.production.status;
+    // Set completed quantity equal to target if status is ready/complete/shipped
+    final completedQty = _isReadOnly 
+        ? widget.production.targetQuantity 
+        : widget.production.completedQuantity;
+    _completedController = TextEditingController(text: completedQty.toString());
   }
 
   @override
@@ -82,7 +85,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
         ),
         Expanded(
           child: Text(
-            'Production Management System',
+            'Production Details System',
             style: TextStyle(
               color: Palette.whiteColor, // Updated text color
               fontSize: ResponsiveHelper.isMobile(context) ? 20 : 28,
@@ -129,6 +132,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     );
   }
 
+  // Update the _buildProgressSection method
   Widget _buildProgressSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -138,7 +142,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
-            color: Palette.primaryTextColor,
+            color: Color(0xFF334155),
           ),
         ),
         const SizedBox(height: 16),
@@ -148,13 +152,20 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
               child: TextFormField(
                 controller: _completedController,
                 keyboardType: TextInputType.number,
+                enabled: !_isReadOnly, // Disable if order is ready/complete/shipped
                 decoration: InputDecoration(
                   labelText: 'Completed Units',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
+                  filled: _isReadOnly,
+                  fillColor: _isReadOnly ? const Color(0xFFF1F5F9) : null,
+                  suffixIcon: _isReadOnly 
+                    ? const Icon(Icons.check_circle, color: Color(0xFF22C55E))
+                    : null,
                 ),
                 onChanged: (value) {
+                  if (_isReadOnly) return;
                   final completed = int.tryParse(value) ?? 0;
                   if (completed <= widget.production.targetQuantity) {
                     _updateProgress(completed);
@@ -167,19 +178,22 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
               'of ${widget.production.targetQuantity}',
               style: const TextStyle(
                 fontSize: 16,
-                color: Palette.secondaryTextColor,
+                color: Color(0xFF64748B),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 16),
-        LinearProgressIndicator(
-          value: widget.production.progress,
-          backgroundColor: Palette.dividerColor,
-          valueColor: const AlwaysStoppedAnimation<Color>(Palette.primaryBlue),
-          minHeight: 8,
-          borderRadius: BorderRadius.circular(4),
-        ),
+        if (_isReadOnly) ...[
+          const SizedBox(height: 8),
+          Text(
+            'This production is ${_status.toLowerCase()} and cannot be edited',
+            style: TextStyle(
+              fontSize: 12,
+              color: const Color(0xFF64748B).withOpacity(0.8),
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -258,69 +272,25 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     );
   }
 
+  // Also update the _buildActionButtons method to disable buttons when completed
   Widget _buildActionButtons() {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        Expanded(
-          child: Container(
-            margin: const EdgeInsets.only(right: 8),
-            child: ElevatedButton(
-              onPressed: () {
-                Navigator.pushNamed(
-                  context,
-                  '/update-production',
-                  arguments: widget.production,
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                foregroundColor: Palette.whiteColor,
-                backgroundColor: Palette.primaryBlue, // Changed from Pallete.accentColor
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text(
-                'Update Production',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Palette.inverseTextColor, // Changed from Pallete.mainFontColor
-                ),
+        if (!_isReadOnly) ...[
+          ElevatedButton(
+            onPressed: _saveChanges,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1E40AF),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
             ),
+            child: const Text('Save Changes'),
           ),
-        ),
-        Expanded(
-          child: Container(
-            margin: const EdgeInsets.only(left: 8),
-            child: OutlinedButton(
-              onPressed: () {
-                // Show delete confirmation
-                _showDeleteConfirmationDialog();
-              },
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                side: BorderSide(
-                  color: Palette.primaryBlue, // Changed from primaryColor to primaryBlue
-                  width: 2,
-                ),
-              ),
-              child: const Text(
-                'Delete Production',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Palette.primaryBlue, // Changed from primaryColor to primaryBlue
-                ),
-              ),
-            ),
-          ),
-        ),
+        ],
       ],
     );
   }
@@ -455,6 +425,48 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
         ),
       );
     }
+  }
+
+  void _saveChanges() {
+    final completed = int.tryParse(_completedController.text) ?? 0;
+    if (completed > widget.production.targetQuantity) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Completed quantity cannot exceed target quantity'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Only update status to completed if it was not already
+    final newStatus = completed == widget.production.targetQuantity && _status != 'completed' 
+        ? 'completed' 
+        : _status;
+
+    Provider.of<ProductionViewModel>(context, listen: false)
+        .updateProduction(widget.production.id, {
+      'completed_quantity': completed,
+      'status': newStatus,
+      'updated_at': DateTime.now().toIso8601String(),
+    }).then((_) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Changes saved successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      setState(() {
+        _status = newStatus;
+      });
+    }).catchError((error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error saving changes: $error'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    });
   }
 
   @override

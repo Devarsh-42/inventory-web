@@ -26,7 +26,6 @@ class OrdersRepository {
 
   Future<Order> createOrder(Order order) async {
     try {
-      // Start a Supabase transaction
       final response = await _supabaseService.client.rpc('create_order_with_productions', 
         params: {
           'order_data': {
@@ -34,19 +33,18 @@ class OrdersRepository {
             'client_name': order.clientName,
             'due_date': order.dueDate.toIso8601String(),
             'created_date': order.createdDate.toIso8601String(),
-            'status': order.status.toString().split('.').last,
+            'status': 'in_production', // Always start with in_production
             'priority': order.priority.toString().split('.').last,
             'special_instructions': order.specialInstructions,
           },
           'products_data': order.products.map((product) => ({
             'name': product.name,
             'quantity': product.quantity,
-            'completed': product.completed,
+            'completed': 0,
           })).toList(),
         }
       );
 
-      // Fetch the complete order with products
       final completeOrder = await _supabaseService.client
           .from(_tableName)
           .select('''
@@ -110,7 +108,7 @@ class OrdersRepository {
       final orderData = order.toJson()
         ..remove('id')
         ..['created_date'] = DateTime.now().toIso8601String()
-        ..['status'] = OrderStatus.queued.toString().split('.').last;
+        ..['status'] = OrderStatus.in_production.toString().split('.').last;
 
       final orderResponse = await _supabaseService.client
           .from(_tableName)
@@ -233,6 +231,82 @@ class OrdersRepository {
       return (response as List).map((json) => Order.fromJson(json)).toList();
     } catch (e) {
       throw Exception('Failed to fetch pending orders: $e');
+    }
+  }
+
+  Future<Map<String, Map<String, dynamic>>> getOrderDetailsForProductions(
+    List<String> orderIds
+  ) async {
+    try {
+      if (orderIds.isEmpty) return {};
+
+      final response = await _supabaseService.client
+          .from('orders')
+          .select('''
+            id,
+            client_name,
+            display_id,
+            priority,
+            due_date,
+            clients (
+              id,
+              name,
+              phone
+            )
+          ''')
+          .inFilter('id', orderIds);
+
+      return Map.fromEntries(
+        (response as List).map((order) => MapEntry(
+          order['id'],
+          {
+            'clientName': order['clients']['name'] ?? order['client_name'],
+            'displayId': order['display_id'],
+            'priority': order['priority'],
+            'dueDate': DateTime.parse(order['due_date']),
+          },
+        )),
+      );
+    } catch (e) {
+      throw Exception('Failed to fetch order details: $e');
+    }
+  }
+
+  Future<void> updateProductQuantity({
+    required String orderId,
+    required String productId,
+    required int completedQuantity,
+  }) async {
+    try {
+      // First check if the order is in an editable state
+      final orderStatus = await _supabaseService.client
+          .from('orders')
+          .select('status')
+          .eq('id', orderId)
+          .single();
+
+      final status = orderStatus['status'] as String;
+      if (['ready', 'completed', 'shipped'].contains(status.toLowerCase())) {
+        throw Exception('Cannot modify completed, ready or shipped orders');
+      }
+
+      // Update the product completion
+      await _supabaseService.client
+          .from('order_products')
+          .update({
+            'completed': completedQuantity,
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', productId)
+          .eq('order_id', orderId);
+
+      // Call the stored procedure to check and update order status
+      await _supabaseService.client.rpc(
+        'check_order_completion',
+        params: {'order_id_param': orderId}
+      );
+    } catch (e) {
+      throw Exception('Failed to update product quantity: $e');
     }
   }
 }

@@ -37,7 +37,7 @@ class Order {
       createdDate: DateTime.parse(json['created_date']),
       status: OrderStatus.values.firstWhere(
         (e) => e.toString().split('.').last.toLowerCase() == json['status'].toLowerCase(),
-        orElse: () => OrderStatus.queued,
+        orElse: () => OrderStatus.in_production,
       ),
       priority: Priority.values.firstWhere(
         (e) => e.toString().split('.').last.toLowerCase() == json['priority'].toLowerCase(),
@@ -152,10 +152,8 @@ class ProductItem {
 }
 
 enum OrderStatus {
-  queued,
-  inProduction,
+  in_production,
   completed,
-  paused,
   ready,    // Add ready status
   shipped   // Add shipped status
 }

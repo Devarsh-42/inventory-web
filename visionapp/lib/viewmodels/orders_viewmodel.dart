@@ -140,7 +140,7 @@ class OrdersViewModel extends ChangeNotifier {
         products: order.products,
         dueDate: order.dueDate,
         createdDate: DateTime.now(),
-        status: OrderStatus.queued,
+        status: OrderStatus.in_production,
         priority: order.priority,
         specialInstructions: order.specialInstructions,
       );
@@ -187,7 +187,7 @@ class OrdersViewModel extends ChangeNotifier {
       .length;
 
   int get totalUnitsInQueue => _orders
-      .where((order) => order.status == OrderStatus.queued)
+      .where((order) => order.status == OrderStatus.in_production)
       .fold(0, (sum, order) => sum + order.totalUnits);
 
   void sortOrders(OrderSortOption option) {

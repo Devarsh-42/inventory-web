@@ -448,14 +448,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
   String _getStatusText(OrderStatus status) {
     switch (status) {
-      case OrderStatus.queued:
-        return 'Queued';
-      case OrderStatus.inProduction:
+      case OrderStatus.in_production:
         return 'In Production';
       case OrderStatus.completed:
         return 'Completed';
-      case OrderStatus.paused:
-        return 'Paused';
       case OrderStatus.ready:
         return 'Ready';
       case OrderStatus.shipped:

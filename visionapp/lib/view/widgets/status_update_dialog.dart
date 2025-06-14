@@ -42,14 +42,10 @@ class StatusUpdateDialog extends StatelessWidget {
 
   String _getStatusText(OrderStatus status) {
     switch (status) {
-      case OrderStatus.queued:
-        return 'Queued';
-      case OrderStatus.inProduction:
+      case OrderStatus.in_production:
         return 'In Production';
       case OrderStatus.completed:
         return 'Completed';
-      case OrderStatus.paused:
-        return 'Paused';
       case OrderStatus.ready:
         return 'Ready';
       case OrderStatus.shipped:
@@ -59,13 +55,7 @@ class StatusUpdateDialog extends StatelessWidget {
 
   Widget _buildStatusButton(OrderStatus status) {
     switch (status) {
-      case OrderStatus.queued:
-        return _StatusButton(
-          status: status,
-          icon: Icons.pending,
-          backgroundColor: const Color(0xFF1E40AF),
-        );
-      case OrderStatus.inProduction:
+      case OrderStatus.in_production:
         return _StatusButton(
           status: status,
           icon: Icons.engineering,
@@ -76,12 +66,6 @@ class StatusUpdateDialog extends StatelessWidget {
           status: status,
           icon: Icons.check_circle,
           backgroundColor: const Color(0xFF4B5563),
-        );
-      case OrderStatus.paused:
-        return _StatusButton(
-          status: status,
-          icon: Icons.pause_circle,
-          backgroundColor: const Color(0xFFD97706),
         );
       case OrderStatus.ready:
         return _StatusButton(
@@ -141,14 +125,10 @@ class _StatusButton extends StatelessWidget {
 
   String _getStatusText(OrderStatus status) {
     switch (status) {
-      case OrderStatus.queued:
-        return 'Queued';
-      case OrderStatus.inProduction:
+      case OrderStatus.in_production:
         return 'In Production';
       case OrderStatus.completed:
         return 'Completed';
-      case OrderStatus.paused:
-        return 'Paused';
       case OrderStatus.ready:
         return 'Ready';
       case OrderStatus.shipped:

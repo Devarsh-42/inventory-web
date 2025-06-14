@@ -34,24 +34,27 @@ class ProductionViewModel extends ChangeNotifier {
       _error = null;
       notifyListeners();
 
-      print('Loading productions and stats...'); // Add logging
+      final productions = await _repository.getAllProductions();
+      final orderDetails = await _ordersRepository.getOrderDetailsForProductions(
+        productions.where((p) => p.orderId != null)
+            .map((p) => p.orderId!)
+            .toList()
+      );
 
-      // Load productions and stats concurrently
-      final results = await Future.wait([
-        _repository.getAllProductions(),
-        _repository.getProductionStats(),
-      ]);
+      _productions = productions.map((prod) {
+        if (prod.orderId != null && orderDetails.containsKey(prod.orderId)) {
+          return prod.copyWith(
+            orderDetails: orderDetails[prod.orderId],
+          );
+        }
+        return prod;
+      }).toList();
 
-      print('Productions loaded: ${results[0]}'); // Add logging
-      print('Stats loaded: ${results[1]}'); // Add logging
-
-      _productions = results[0] as List<Production>;
-      _stats = results[1] as Map<String, dynamic>;
+      _stats = await _repository.getProductionStats();
       
       _isLoading = false;
       notifyListeners();
     } catch (e) {
-      print('Error in loadProductions: $e'); // Add logging
       _error = e.toString();
       _isLoading = false;
       notifyListeners();
@@ -74,12 +77,24 @@ class ProductionViewModel extends ChangeNotifier {
   // Update production
   Future<void> updateProduction(String id, Map<String, dynamic> updates) async {
     try {
+      final production = _productions.firstWhere((p) => p.id == id);
+      
+      // Don't allow updates if status is ready/complete/shipped
+      if (['ready', 'completed', 'shipped'].contains(production.status.toLowerCase())) {
+        throw Exception('Cannot update completed or shipped productions');
+      }
+
+      _isLoading = true;
+      notifyListeners();
+
       await _repository.updateProduction(id, updates);
-      await loadProductions(); // Refresh the list
+      await loadProductions();
+
     } catch (e) {
       _error = e.toString();
+      _isLoading = false;
       notifyListeners();
-      rethrow;
+      throw e;
     }
   }
 

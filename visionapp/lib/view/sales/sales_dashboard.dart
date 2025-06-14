@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:visionapp/models/orders.dart';
+import 'package:visionapp/view/sales/order_placement_screen.dart';
 import 'package:visionapp/viewmodels/client_viewmodel.dart';
 import 'package:visionapp/viewmodels/orders_viewmodel.dart';
+
 class SalesDashboardScreen extends StatefulWidget {
   const SalesDashboardScreen({Key? key}) : super(key: key);
 
@@ -123,15 +125,29 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
           },
         ),
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          // Navigate to add new order screen
-          Navigator.pushNamed(context, '/add-order');
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const Sales_AddOrderScreen(),
+            ),
+          );
         },
         backgroundColor: const Color(0xFF059669),
-        foregroundColor: Colors.white,
-        child: const Icon(Icons.add, size: 28),
+        icon: const Icon(
+          Icons.add_shopping_cart,
+          color: Colors.white,
+        ),
+        label: const Text(
+          'New Order',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 
@@ -495,21 +511,13 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
     String text;
 
     switch (status) {
-      case OrderStatus.inProduction:
+      case OrderStatus.in_production:
         backgroundColor = const Color(0xFF059669);
         text = 'IN PRODUCTION';
-        break;
-      case OrderStatus.queued:
-        backgroundColor = const Color(0xFF1E40AF);
-        text = 'QUEUED';
         break;
       case OrderStatus.completed:
         backgroundColor = const Color(0xFF4B5563);
         text = 'COMPLETED';
-        break;
-      case OrderStatus.paused:
-        backgroundColor = const Color(0xFFD97706);
-        text = 'PAUSED';
         break;
       case OrderStatus.ready:
         backgroundColor = const Color(0xFF7C3AED);
@@ -564,21 +572,13 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
 
   LinearGradient _getStatusGradient(OrderStatus status) {
     switch (status) {
-      case OrderStatus.queued:
-        return const LinearGradient(
-          colors: [Color(0xFF1E40AF), Color(0xFF3B82F6)],
-        );
-      case OrderStatus.inProduction:
+      case OrderStatus.in_production:
         return const LinearGradient(
           colors: [Color(0xFF059669), Color(0xFF10B981)],
         );
       case OrderStatus.completed:
         return const LinearGradient(
           colors: [Color(0xFF4B5563), Color(0xFF6B7280)],
-        );
-      case OrderStatus.paused:
-        return const LinearGradient(
-          colors: [Color(0xFFD97706), Color(0xFFFFA500)],
         );
       case OrderStatus.shipped:
         return const LinearGradient(
@@ -593,9 +593,7 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
 
   Color _getStatusColor(OrderStatus status) {
     switch (status) {
-      case OrderStatus.queued:
-        return const Color(0xFF1E40AF);
-      case OrderStatus.inProduction:
+      case OrderStatus.in_production:
         return const Color(0xFF059669);
       case OrderStatus.completed:
         return const Color(0xFF4B5563);
@@ -603,21 +601,15 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
         return const Color(0xFF7C3AED);
       case OrderStatus.ready:
         return const Color(0xFFDC2626);
-      case OrderStatus.paused:
-        return const Color(0xFFD97706);
     }
   }
 
   String _getStatusText(OrderStatus status) {
     switch (status) {
-      case OrderStatus.queued:
-        return 'Queued';
-      case OrderStatus.inProduction:
+      case OrderStatus.in_production:
         return 'In Production';
       case OrderStatus.completed:
         return 'Completed';
-      case OrderStatus.paused:
-        return 'Paused';
       case OrderStatus.shipped:
         return 'Shipped';
       case OrderStatus.ready:

@@ -10,7 +10,6 @@ import 'package:visionapp/view/production/production_bottom_nav.dart';
 import 'package:visionapp/view/production/production_details_screen.dart';
 import 'package:visionapp/view/production/production_management_screen.dart';
 import 'package:visionapp/view/production/production_queue_management_screen.dart';
-import 'package:visionapp/view/production/ready_to_ship_screen.dart';
 import 'package:visionapp/view/production/dispatch_screen.dart'; // Import DispatchScreen
 import 'package:visionapp/viewmodels/completed_production_viewmodel.dart';
 import 'package:visionapp/widgets/inventory_status_widget.dart';
@@ -281,7 +280,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
           create: (_) => DispatchViewModel(
             repository: DispatchRepository(),
           ),
-          child: const ReadyToShipScreen(),
+          child: const DispatchScreen(),
         ),
       ),
     );
@@ -304,12 +303,12 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch, // Make children fill height
             children: [
               Expanded(
-                flex: 7, // Increase flex for inventory status
+                flex: 9, // Increase flex for inventory status
                 child: _buildInventoryStatus(),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 8),
               Expanded(
-                flex: 3, // Decrease flex for stat cards
+                flex: 1, // Decrease flex for stat cards
                 child: _buildStatCards(viewModel),
               ),
             ],
@@ -344,12 +343,12 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => const ProductionManagementScreen(),
+                builder: (context) => const ProductsScreen(),
               ),
             ),
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         Flexible(
           child: _buildStatCard(
             title: 'READY TO SHIP',
@@ -394,7 +393,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
             Text(
               NumberFormatter.formatQuantity(value),
               style: const TextStyle(
-                fontSize: 24,
+                fontSize: 20,
                 fontWeight: FontWeight.w800,
                 color: Colors.white,
                 letterSpacing: -0.5,

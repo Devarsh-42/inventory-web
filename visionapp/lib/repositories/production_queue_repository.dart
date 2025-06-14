@@ -1,5 +1,6 @@
 // repositories/production_queue_repository.dart
 import 'package:visionapp/models/Production_batch_model.dart';
+import 'package:visionapp/models/grouped_production.dart';
 import 'package:visionapp/models/production_completion.dart';
 import '../core/services/supabase_services.dart';
 import '../models/production.dart';
@@ -86,7 +87,11 @@ class ProductionQueueRepository {
     }
   }
 
-  Future<void> addToQueue(String productionId, int quantity) async {
+  Future<void> addToQueue(
+    String productionId, 
+    int quantity, {
+    String? displayName,  // Add displayName parameter
+  }) async {
     try {
       // Get current user ID
       final userId = _supabaseService.client.auth.currentUser?.id;
@@ -141,9 +146,10 @@ class ProductionQueueRepository {
           .select('display_name')
           .ilike('display_name', '${production['product_name']}%');
 
-      String displayName = production['product_name'];
-      if (existingItems.isNotEmpty) {
-        displayName = '${production['product_name']} #${existingItems.length + 1}';
+      // Use provided displayName or generate one
+      String itemDisplayName = displayName ?? production['product_name'];
+      if (displayName == null && existingItems.isNotEmpty) {
+        itemDisplayName = '${production['product_name']} #${existingItems.length + 1}';
       }
 
       // Get next queue position
@@ -163,7 +169,7 @@ class ProductionQueueRepository {
             'production_id': productionId,
             'queue_position': newPosition + 1,
             'quantity': quantity,
-            'display_name': displayName,
+            'display_name': itemDisplayName,
             'status': 'pending',
             'completed': false,
             'created_by': userId
@@ -415,6 +421,123 @@ class ProductionQueueRepository {
     } catch (e) {
       print('Error in updateProductionWithQueue: $e');
       throw Exception('Failed to update production status: $e');
+    }
+  }
+
+  Future<List<GroupedProduction>> getGroupedUnqueuedProductions() async {
+    try {
+      final response = await _supabaseService.client
+          .from('productions')
+          .select('''
+            id,
+            product_name,
+            target_quantity,
+            completed_quantity,
+            orders!inner (
+              id,
+              display_id,
+              priority,
+              due_date
+            )
+          ''')
+          .eq('status', 'queued');
+
+      // Group by product name
+      Map<String, GroupedProduction> groupedProducts = {};
+
+      for (var prod in response) {
+        final productName = prod['product_name'];
+        final order = prod['orders'];
+        
+        // Calculate available quantity
+        final queuedResponse = await _supabaseService.client
+            .from('production_queue')
+            .select('quantity')
+            .eq('production_id', prod['id']);
+        
+        final queuedQuantity = (queuedResponse as List)
+            .fold(0, (sum, item) => sum + (item['quantity'] as int? ?? 0));
+        
+        final availableQuantity = prod['target_quantity'] - queuedQuantity;
+        
+        if (availableQuantity <= 0) continue;
+
+        final orderProduction = OrderProduction(
+          orderId: order['id'],
+          productionId: prod['id'],
+          quantity: prod['target_quantity'],
+          availableQuantity: availableQuantity,
+          priority: order['priority'],
+          dueDate: DateTime.parse(order['due_date']),
+          displayId: order['display_id'],
+        );
+
+        if (groupedProducts.containsKey(productName)) {
+          groupedProducts[productName]!.orders.add(orderProduction);
+          groupedProducts[productName] = GroupedProduction(
+            productName: productName,
+            orders: groupedProducts[productName]!.orders,
+            totalQuantity: (groupedProducts[productName]!.totalQuantity + availableQuantity).toInt(),
+          );
+        } else {
+          groupedProducts[productName] = GroupedProduction(
+            productName: productName,
+            orders: [orderProduction],
+            totalQuantity: availableQuantity,
+          );
+        }
+      }
+
+      return groupedProducts.values.toList();
+    } catch (e) {
+      throw Exception('Failed to get grouped productions: $e');
+    }
+  }
+
+  Future<void> addToQueueWithPriority(String productName, int quantity) async {
+    try {
+      final groupedProds = await getGroupedUnqueuedProductions();
+      final group = groupedProds.firstWhere(
+        (g) => g.productName == productName,
+        orElse: () => throw Exception('Product not found'),
+      );
+
+      if (quantity > group.totalQuantity) {
+        throw Exception('Requested quantity exceeds available quantity');
+      }
+
+      // Sort orders by priority and due date
+      final sortedOrders = List<OrderProduction>.from(group.orders)
+        ..sort((a, b) {
+          final priorityWeight = {
+            'urgent': 3,
+            'high': 2,
+            'normal': 1,
+          };
+          final comparison = priorityWeight[b.priority]!.compareTo(priorityWeight[a.priority]!);
+          if (comparison != 0) return comparison;
+          return a.dueDate.compareTo(b.dueDate);
+        });
+
+      // Add to queue respecting priority
+      int remainingQuantity = quantity;
+      for (var order in sortedOrders) {
+        if (remainingQuantity <= 0) break;
+
+        final qtyToAdd = remainingQuantity > order.availableQuantity 
+            ? order.availableQuantity 
+            : remainingQuantity;
+
+        await addToQueue(
+          order.productionId,
+          qtyToAdd,
+          displayName: '${productName} (Order ${order.displayId})',
+        );
+
+        remainingQuantity -= qtyToAdd;
+      }
+    } catch (e) {
+      throw Exception('Failed to add to queue with priority: $e');
     }
   }
 }

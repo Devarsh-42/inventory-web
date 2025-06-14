@@ -1,6 +1,7 @@
 // lib/views/admin/orders_management_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:visionapp/core/utils/responsive_helper.dart';
 import 'package:visionapp/view/management/AddNewOrders_Screen.dart';
 import '../../viewmodels/orders_viewmodel.dart';
 import '../../models/orders.dart';
@@ -364,19 +365,8 @@ class _OrdersManagementScreenState extends State<OrdersManagementScreen> {
   }
 
   Widget _buildOrderCard(Order order) {
-    // Get color based on priority
-    Color priorityColor;
-    switch (order.priority) {
-      case Priority.urgent:
-        priorityColor = const Color(0xFFDC2626); // Red
-        break;
-      case Priority.high:
-        priorityColor = const Color(0xFFFACC15); // Yellow
-        break;
-      case Priority.normal:
-        priorityColor = const Color(0xFF22C55E); // Green
-        break;
-    }
+    final isMobile = ResponsiveHelper.isMobile(context);
+    Color priorityColor = _getPriorityColor(order.priority);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -411,25 +401,69 @@ class _OrdersManagementScreenState extends State<OrdersManagementScreen> {
                             Text(
                               '${order.clientName} #${order.displayId}',
                               style: const TextStyle(
-                                color: Color(0xFF111827),
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                letterSpacing: -0.2,
                               ),
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '${order.products.length} Products • Due ${_formatDate(order.dueDate)}',
-                              style: const TextStyle(
-                                color: Color(0xFF6B7280),
+                              'Due ${_formatDate(order.dueDate)}',
+                              style: TextStyle(
+                                color: Colors.grey[600],
                                 fontSize: 14,
-                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           ],
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 12),
+                  // Products List
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey[200]!),
+                    ),
+                    padding: const EdgeInsets.all(8),
+                    child: Column(
+                      children: order.products.map((product) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                product.name,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[800],
+                                ),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.blue[50],
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                '${product.completed}/${product.quantity}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.blue[700],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )).toList(),
+                    ),
                   ),
                   const SizedBox(height: 14),
                   Row(
@@ -453,7 +487,7 @@ class _OrdersManagementScreenState extends State<OrdersManagementScreen> {
           // Priority triangle indicator
           Positioned(
             top: 0,
-            right: 0, // Changed from left: 0
+            right: 0,
             child: CustomPaint(
               painter: TrianglePainter(color: priorityColor),
               size: const Size(30, 30),
@@ -462,6 +496,17 @@ class _OrdersManagementScreenState extends State<OrdersManagementScreen> {
         ],
       ),
     );
+  }
+
+  Color _getPriorityColor(Priority priority) {
+    switch (priority) {
+      case Priority.urgent:
+        return const Color(0xFFDC2626);
+      case Priority.high:
+        return const Color(0xFFFACC15);
+      case Priority.normal:
+        return const Color(0xFF22C55E);
+    }
   }
 
   Widget _buildPriorityBadge(Priority priority) {
@@ -505,25 +550,17 @@ class _OrdersManagementScreenState extends State<OrdersManagementScreen> {
     String text;
 
     switch (status) {
-      case OrderStatus.inProduction:
+      case OrderStatus.in_production:
         backgroundColor = const Color(0xFF059669);
         text = 'IN PRODUCTION';
-        break;
-      case OrderStatus.queued:
-        backgroundColor = const Color(0xFF1E40AF);
-        text = 'QUEUED';
         break;
       case OrderStatus.completed:
         backgroundColor = const Color(0xFF4B5563);
         text = 'COMPLETED';
         break;
-      case OrderStatus.paused:
-        backgroundColor = const Color(0xFFD97706);
-        text = 'PAUSED';
-        break;
       case OrderStatus.ready:
         backgroundColor = const Color(0xFF16A34A);
-        text = 'READY FOR PICKUP';
+        text = 'READY';
         break;
       case OrderStatus.shipped:
         backgroundColor = const Color(0xFF16A34A);
@@ -734,14 +771,10 @@ class _OrdersManagementScreenState extends State<OrdersManagementScreen> {
 
   String _getStatusText(OrderStatus status) {
     switch (status) {
-      case OrderStatus.inProduction:
+      case OrderStatus.in_production:
         return 'In Production';
-      case OrderStatus.queued:
-        return 'Queued';
       case OrderStatus.completed:
         return 'Completed';
-      case OrderStatus.paused:
-        return 'Paused';
       case OrderStatus.ready:
         return 'Ready';
       case OrderStatus.shipped:

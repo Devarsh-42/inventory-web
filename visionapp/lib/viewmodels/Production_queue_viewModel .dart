@@ -1,6 +1,7 @@
 // viewmodels/production_queue_viewmodel.dart
 import 'package:flutter/foundation.dart';
 import 'package:visionapp/models/Production_batch_model.dart';
+import 'package:visionapp/models/grouped_production.dart';
 import '../models/production.dart';
 import '../repositories/production_queue_repository.dart';
 import '../repositories/orders_repository.dart';
@@ -111,12 +112,40 @@ class ProductionQueueViewModel extends ChangeNotifier {
   }
 
   // Add production to queue
-  Future<void> addToQueue(String productionId, int quantity) async {
+  Future<void> addToQueue(
+    String productionId, 
+    int quantity, {
+    String? displayName,
+  }) async {
     try {
-      await _repository.addToQueue(productionId, quantity);
+      await _repository.addToQueue(
+        productionId, 
+        quantity,
+        displayName: displayName,
+      );
       await loadQueue();
     } catch (e) {
       _error = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  // Add method for priority-based queue addition
+  Future<void> addToQueueWithPriority(String productName, int quantity) async {
+    try {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      await _repository.addToQueueWithPriority(productName, quantity);
+      await loadQueue();
+
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
       notifyListeners();
       rethrow;
     }
@@ -342,6 +371,27 @@ class ProductionQueueViewModel extends ChangeNotifier {
 
       _isLoading = false;
       notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  // Add to the ProductionQueueViewModel class
+  Future<List<GroupedProduction>> getGroupedProductions() async {
+    try {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      final groupedProductions = await _repository.getGroupedUnqueuedProductions();
+      
+      _isLoading = false;
+      notifyListeners();
+      
+      return groupedProductions;
     } catch (e) {
       _error = e.toString();
       _isLoading = false;

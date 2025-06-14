@@ -252,6 +252,62 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         const SizedBox(height: 12),
         
         ...widget.order.products.map((product) => _buildProductItem(product)).toList(),
+        
+        // Add product details section
+        const SizedBox(height: 12),
+        const Divider(height: 1),
+        const SizedBox(height: 12),
+        
+        // Products list
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Products:',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF64748B),
+              ),
+            ),
+            const SizedBox(height: 8),
+            ...widget.order.products.map((product) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      product.name,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF334155),
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE2E8F0),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${product.completed}/${product.quantity}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF475569),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )).toList(),
+          ],
+        ),
       ],
     );
   }
@@ -441,21 +497,13 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
   LinearGradient _getStatusGradient(OrderStatus status) {
     switch (status) {
-      case OrderStatus.inProduction:
+      case OrderStatus.in_production:
         return const LinearGradient(
           colors: [Color(0xFF1E40AF), Color(0xFF3B82F6)]
-        );
-      case OrderStatus.queued:
-        return const LinearGradient(
-          colors: [Color(0xFFEAB308), Color(0xFFFACC15)]
         );
       case OrderStatus.completed:
         return const LinearGradient(
           colors: [Color(0xFF22C55E), Color(0xFF16A34A)]
-        );
-      case OrderStatus.paused:
-        return const LinearGradient(
-          colors: [Color(0xFFDC2626), Color(0xFFEF4444)]
         );
       case OrderStatus.ready:
         return const LinearGradient(
@@ -470,14 +518,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
   String _getStatusText(OrderStatus status) {
     switch (status) {
-      case OrderStatus.inProduction:
+      case OrderStatus.in_production:
         return 'In Production';
-      case OrderStatus.queued:
-        return 'Queued';
       case OrderStatus.completed:
         return 'Completed';
-      case OrderStatus.paused:
-        return 'Paused';
       case OrderStatus.ready:
         return 'Ready';
       case OrderStatus.shipped:

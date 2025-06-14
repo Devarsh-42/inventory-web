@@ -798,22 +798,21 @@ class _ProductionQueueScreenState extends State<ProductionQueueScreen> {
     ProductionQueueViewModel queueViewModel
   ) async {
     try {
-      final productions = await Provider.of<ProductionViewModel>(context, listen: false)
-          .getUnqueuedProductions();
+      final groupedProductions = await queueViewModel.getGroupedProductions();
 
       if (!mounted) return;
 
-      if (productions.isEmpty) {
+      if (groupedProductions.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('No productions with remaining quantity available'),
+            content: Text('No productions available'),
             backgroundColor: Colors.orange,
           ),
         );
         return;
       }
 
-      Production? selectedProduction;
+      String? selectedProduct;
       int quantity = 0;
 
       await showDialog<void>(
@@ -822,42 +821,63 @@ class _ProductionQueueScreenState extends State<ProductionQueueScreen> {
           return StatefulBuilder(
             builder: (context, setState) {
               return AlertDialog(
-                title: const Text('Add Production to Queue'),
+                title: const Text('Add to Production Queue'),
                 content: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    DropdownButtonFormField<Production>(
-                      items: productions.map((prod) {
+                    DropdownButtonFormField<String>(
+                      items: groupedProductions.map((group) {
                         return DropdownMenuItem(
-                          value: prod,
+                          value: group.productName,
                           child: Text(
-                            '${prod.productName} (${prod.availableQuantity}/${prod.targetQuantity} units available)'
+                            '${group.productName} (${NumberFormatter.formatQuantity(group.totalQuantity)} units available)',
                           ),
                         );
                       }).toList(),
-                      onChanged: (prod) {
+                      onChanged: (value) {
                         setState(() {
-                          selectedProduction = prod;
+                          selectedProduct = value;
                           quantity = 0;
                         });
                       },
                       decoration: const InputDecoration(
-                        labelText: 'Select Production',
+                        labelText: 'Select Product',
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    if (selectedProduction != null) TextFormField(
-                      decoration: InputDecoration(
-                        labelText: 'Quantity (max: ${selectedProduction!.availableQuantity})',
+                    if (selectedProduct != null) ...[
+                      const SizedBox(height: 16),
+                      Text(
+                        'Orders:',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
-                      keyboardType: TextInputType.number,
-                      onChanged: (value) {
-                        final parsed = int.tryParse(value) ?? 0;
-                        setState(() {
-                          quantity = parsed;
-                        });
-                      },
-                    ),
+                      const SizedBox(height: 8),
+                      ...groupedProductions
+                          .firstWhere((g) => g.productName == selectedProduct)
+                          .orders
+                          .map((order) => Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Text(
+                              '• Order ${order.displayId}: ${NumberFormatter.formatQuantity(order.availableQuantity)} units (${order.priority})',
+                              style: const TextStyle(fontSize: 14),
+                            ),
+                          )),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        decoration: InputDecoration(
+                          labelText: 'Quantity (max: ${groupedProductions.firstWhere((g) => g.productName == selectedProduct).totalQuantity})',
+                        ),
+                        keyboardType: TextInputType.number,
+                        onChanged: (value) {
+                          setState(() {
+                            quantity = int.tryParse(value) ?? 0;
+                          });
+                        },
+                      ),
+                    ],
                   ],
                 ),
                 actions: [
@@ -866,13 +886,15 @@ class _ProductionQueueScreenState extends State<ProductionQueueScreen> {
                     child: const Text('Cancel'),
                   ),
                   ElevatedButton(
-                    onPressed: selectedProduction != null && 
+                    onPressed: selectedProduct != null && 
                              quantity > 0 && 
-                             quantity <= selectedProduction!.availableQuantity
+                             quantity <= groupedProductions
+                                 .firstWhere((g) => g.productName == selectedProduct)
+                                 .totalQuantity
                         ? () {
                             Navigator.of(context).pop();
-                            queueViewModel.addToQueue(
-                              selectedProduction!.id,
+                            queueViewModel.addToQueueWithPriority(
+                              selectedProduct!,
                               quantity,
                             );
                           }

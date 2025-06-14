@@ -66,13 +66,13 @@ class ProductionBottomNav extends StatelessWidget {
             '/dispatch',
             const DispatchScreen(),
           ),
-          _buildNavItem(
-            context,
-            'Orders',
-            Icons.check_circle,
-            '/orders',
-            ProductionOrdersManagementScreen(),
-          ),
+          // _buildNavItem(
+          //   context,
+          //   'Orders',
+          //   Icons.check_circle,
+          //   '/orders',
+          //   ProductionOrdersManagementScreen(),
+          // ),
         ],
       ),
     );

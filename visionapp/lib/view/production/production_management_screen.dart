@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:visionapp/core/utils/number_formatter.dart';
+import 'package:visionapp/models/grouped_production_view.dart';
 import 'package:visionapp/models/orders.dart';
+import 'package:visionapp/viewmodels/dispatch_viewmodel.dart';
+import 'package:visionapp/widgets/inventory_status_widget.dart';
 import '../../viewmodels/production_viewmodel.dart';
 import '../../models/production.dart';
 import 'add_product_screen.dart';
@@ -51,32 +55,36 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
         child: SafeArea(
           child: Column(
             children: [
-              // Header
-              Container(
+              // Header with Inventory Status
+              Padding(
                 padding: const EdgeInsets.all(20),
-                child: const Text(
-                  'Production Management',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.5,
-                  ),
-                  textAlign: TextAlign.center,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Production Management',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Consumer<DispatchViewModel>(
+                      builder: (context, dispatchViewModel, _) {
+                        return InventoryStatusWidget(
+                          productQuantities: dispatchViewModel.productInventory,
+                          totalQuantity: dispatchViewModel.totalInventory,
+                          isExpanded: false,
+                        );
+                      },
+                    ),
+                  ],
                 ),
               ),
-              // Tab Bar
-              TabBar(
-                controller: _tabController,
-                tabs: const [
-                  Tab(text: 'Active Productions'),
-                  Tab(text: 'Pending Orders'),
-                ],
-                indicatorColor: Colors.white,
-                labelColor: Colors.white,
-                unselectedLabelColor: Colors.white70,
-              ),
-              // Main Content Container
+              
+              // Main Content
               Expanded(
                 child: Container(
                   margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -91,22 +99,193 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
                       ),
                     ],
                   ),
-                  child: TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _buildProductionsTab(),
-                      _buildPendingOrdersTab(),
-                    ],
-                  ),
+                  child: _buildGroupedProductionsTab(),
                 ),
               ),
-              const SizedBox(height: 20),
             ],
           ),
         ),
       ),
       bottomNavigationBar: const ProductionBottomNav(currentRoute: '/products'),
     );
+  }
+
+  Widget _buildGroupedProductionsTab() {
+    return Consumer<ProductionViewModel>(
+      builder: (context, viewModel, _) {
+        if (viewModel.isLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final groupedProductions = _groupProductions(viewModel.productions);
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: groupedProductions.length,
+          itemBuilder: (context, index) {
+            final group = groupedProductions[index];
+            return _buildGroupedProductionCard(group);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildGroupedProductionCard(GroupedProductionView group) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF1E40AF).withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ExpansionTile(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              group.productName,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1E40AF),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Total: ${NumberFormatter.formatQuantity(group.totalTargetQuantity)} units',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 8),
+            LinearProgressIndicator(
+              value: group.progress,
+              backgroundColor: Colors.grey[200],
+              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF1E40AF)),
+            ),
+          ],
+        ),
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Orders:',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1E40AF),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ...group.orders.map((order) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      Text(
+                        '#${order.displayId}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF3B82F6),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '${order.clientName} - ${NumberFormatter.formatQuantity(order.quantity)} units',
+                          style: const TextStyle(color: Color(0xFF4B5563)),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _getPriorityColor(order.priority).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          order.priority.toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: _getPriorityColor(order.priority),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )).toList(),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<GroupedProductionView> _groupProductions(List<Production> productions) {
+    Map<String, GroupedProductionView> groups = {};
+
+    for (var prod in productions) {
+      if (!groups.containsKey(prod.productName)) {
+        groups[prod.productName] = GroupedProductionView(
+          productName: prod.productName,
+          productions: [],
+          totalTargetQuantity: 0,
+          totalCompletedQuantity: 0,
+          orders: [],
+        );
+      }
+
+      groups[prod.productName]!.productions.add(prod);
+      groups[prod.productName]!.totalTargetQuantity += prod.targetQuantity;
+      groups[prod.productName]!.totalCompletedQuantity += prod.completedQuantity;
+
+      if (prod.orderId != null && prod.orderDetails != null) {
+        // Check if order is not already added
+        final orderExists = groups[prod.productName]!.orders
+            .any((order) => order.orderId == prod.orderId);
+        
+        if (!orderExists) {
+          groups[prod.productName]!.orders.add(
+            OrderSummary(
+              orderId: prod.orderId!,
+              displayId: prod.orderDetails!['displayId'] ?? '',
+              clientName: prod.orderDetails!['clientName'] ?? 'Unknown Client',
+              quantity: prod.targetQuantity,
+              priority: prod.orderDetails!['priority'] ?? 'normal',
+              dueDate: prod.orderDetails!['dueDate'] ?? DateTime.now(),
+            ),
+          );
+        }
+      }
+    }
+
+    return groups.values.toList();
+  }
+
+  Color _getPriorityColor(String priority) {
+    switch (priority.toLowerCase()) {
+      case 'urgent':
+        return const Color(0xFFDC2626);
+      case 'high':
+        return const Color(0xFFF59E0B);
+      default:
+        return const Color(0xFF10B981);
+    }
   }
 
   Widget _buildProductionsTab() {

@@ -10,6 +10,7 @@ import 'package:visionapp/view/admin/performance_management_admin_screen.dart' a
 import 'package:visionapp/view/auth/login_screen.dart';
 import 'package:visionapp/view/management/AddNewOrders_Screen.dart';
 import 'package:visionapp/view/production/production_dashboard.dart';
+import 'package:visionapp/viewmodels/products_viewmodel.dart';
 import '../../viewmodels/orders_viewmodel.dart';
 import '../../models/orders.dart';
 import '../../view/widgets/custom_button.dart';
@@ -139,44 +140,20 @@ class _AdminDashboardState extends State<AdminDashboard> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Completed Orders'),
+        title: const Text('Delete Finished Orders'),
         content: const Text(
-          'Are you sure you want to delete all completed orders? This action cannot be undone.'
+          'This will permanently delete all completed, ready, and shipped orders. '
+          'This action cannot be undone. Are you sure?'
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () async {
-              try {
-                final ordersVM = Provider.of<OrdersViewModel>(context, listen: false);
-                Navigator.pop(context); // Close dialog
-                await ordersVM.deleteCompletedOrders();
-                
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Completed orders deleted successfully'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Error deleting orders: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
+          TextButton(
+            onPressed: () {
+              context.read<OrdersViewModel>().deleteAllFinishedOrders();
+              Navigator.pop(context);
             },
             child: const Text('Delete'),
           ),
@@ -202,18 +179,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
         ),
         Row(
           children: [
-            Consumer<OrdersViewModel>(
-              builder: (context, viewModel, _) {
-                if (viewModel.hasCompletedOrders()) {
-                  return IconButton(
-                    icon: const Icon(Icons.delete_sweep),
-                    onPressed: () => _showDeleteCompletedDialog(),
-                    tooltip: 'Delete Completed Orders',
-                    color: Colors.white,
-                  );
-                }
-                return const SizedBox.shrink();
-              },
+            IconButton(
+              icon: const Icon(Icons.delete_sweep),
+              onPressed: () => _showDeleteCompletedDialog(),
+              tooltip: 'Delete Completed/Ready/Shipped Orders',
+              color: Colors.white,
             ),
             IconButton(
               onPressed: () => _showLogoutDialog(),
@@ -661,37 +631,42 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     child: Column(
                       children: order.products.map((product) => Padding(
                         padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                product.name,
-                                style: TextStyle(
-                                  fontSize: isMobile ? 12 : 14,
-                                  color: Colors.grey[800],
+                        child: Consumer<ProductsViewModel>(
+                          builder: (context, productsVM, _) {
+                            final productName = productsVM.getProductName(product.productId);
+                            return Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    productName,
+                                    style: TextStyle(
+                                      fontSize: isMobile ? 12 : 14,
+                                      color: Colors.grey[800],
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.blue[50],
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                '${product.completed}/${product.quantity}',
-                                style: TextStyle(
-                                  fontSize: isMobile ? 11 : 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.blue[700],
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue[50],
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    '${product.completed}/${product.quantity}',
+                                    style: TextStyle(
+                                      fontSize: isMobile ? 11 : 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.blue[700],
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ),
-                          ],
+                              ],
+                            );
+                          },
                         ),
                       )).toList(),
                     ),

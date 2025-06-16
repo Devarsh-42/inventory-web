@@ -7,85 +7,116 @@ enum InventoryStatus {
 
 class Inventory {
   final String id;
-  final String productId;
+  final String productionId;  // Changed from productId
   final String productName;
-  final int currentStock;
-  final int minimumStock;
-  final int maximumStock;
-  final String location;
-  final DateTime lastUpdated;
-  final InventoryStatus status;
+  final int totalQuantity;
+  final int availableQty;     // Changed from availableQuantity
+  final int allocatedQty;     // Changed from allocatedQuantity
+  final DateTime createdAt;    // Added
+  final DateTime updatedAt;    // Changed from lastUpdated
+
+  // Computed property for current quantity
+  int get currentQty => availableQty - allocatedQty;
+
+  // Updated status calculation based on available quantity
+  InventoryStatus get status {
+    if (availableQty <= 0) return InventoryStatus.outOfStock;
+    if (availableQty < (totalQuantity * 0.2)) return InventoryStatus.lowStock;
+    return InventoryStatus.inStock;
+  }
 
   Inventory({
     required this.id,
-    required this.productId,
+    required this.productionId,
     required this.productName,
-    required this.currentStock,
-    required this.minimumStock,
-    required this.maximumStock,
-    required this.location,
-    required this.lastUpdated,
-    required this.status,
+    required this.totalQuantity,
+    required this.availableQty,
+    required this.allocatedQty,
+    required this.createdAt,
+    required this.updatedAt,
   });
 
   factory Inventory.fromJson(Map<String, dynamic> json) {
     return Inventory(
       id: json['id'],
-      productId: json['product_id'],
+      productionId: json['production_id'],
       productName: json['product_name'],
-      currentStock: json['current_stock'],
-      minimumStock: json['minimum_stock'],
-      maximumStock: json['maximum_stock'],
-      location: json['location'] ?? '',
-      lastUpdated: DateTime.parse(json['last_updated']),
-      status: InventoryStatus.values.firstWhere(
-        (e) => e.toString() == 'InventoryStatus.${json['status']}',
-        orElse: () => InventoryStatus.inStock,
-      ),
+      totalQuantity: json['total_quantity'],
+      availableQty: json['available_qty'],
+      allocatedQty: json['allocated_qty'],
+      createdAt: DateTime.parse(json['created_at']),
+      updatedAt: DateTime.parse(json['updated_at']),
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'product_id': productId,
+      'production_id': productionId,
       'product_name': productName,
-      'current_stock': currentStock,
-      'minimum_stock': minimumStock,
-      'maximum_stock': maximumStock,
-      'location': location,
-      'last_updated': lastUpdated.toIso8601String(),
-      'status': status.toString().split('.').last,
+      'total_quantity': totalQuantity,
+      'available_qty': availableQty,
+      'allocated_qty': allocatedQty,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
     };
-  }
-
-  InventoryStatus get calculatedStatus {
-    if (currentStock <= 0) return InventoryStatus.outOfStock;
-    if (currentStock <= minimumStock) return InventoryStatus.lowStock;
-    return InventoryStatus.inStock;
   }
 
   Inventory copyWith({
     String? id,
-    String? productId,
+    String? productionId,
     String? productName,
-    int? currentStock,
-    int? minimumStock,
-    int? maximumStock,
-    String? location,
-    DateTime? lastUpdated,
-    InventoryStatus? status,
+    int? totalQuantity,
+    int? availableQty,
+    int? allocatedQty,
+    DateTime? createdAt,
+    DateTime? updatedAt,
   }) {
     return Inventory(
       id: id ?? this.id,
-      productId: productId ?? this.productId,
+      productionId: productionId ?? this.productionId,
       productName: productName ?? this.productName,
-      currentStock: currentStock ?? this.currentStock,
-      minimumStock: minimumStock ?? this.minimumStock,
-      maximumStock: maximumStock ?? this.maximumStock,
-      location: location ?? this.location,
-      lastUpdated: lastUpdated ?? this.lastUpdated,
-      status: status ?? this.status,
+      totalQuantity: totalQuantity ?? this.totalQuantity,
+      availableQty: availableQty ?? this.availableQty,
+      allocatedQty: allocatedQty ?? this.allocatedQty,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
+  }
+}
+
+class InventoryStatusData {
+  final String productName;
+  final String completionId;  // Add this field
+  int totalQuantity;
+  int allocatedQuantity;
+  int availableQuantity;
+
+  InventoryStatusData({
+    required this.productName,
+    required this.completionId,  // Add this parameter
+    required this.totalQuantity,
+    required this.allocatedQuantity,
+    required this.availableQuantity,
+  });
+
+  factory InventoryStatusData.fromJson(Map<String, dynamic> json) {
+    return InventoryStatusData(
+      productName: json['product_name'],
+      completionId: json['completion_id'], // Initialize new field
+      totalQuantity: json['total_quantity'] ?? 0,
+      allocatedQuantity: json['allocated_quantity'] ?? 0,
+      availableQuantity: json['available_quantity'] ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'product_name': productName,
+      'completion_id': completionId, // Serialize new field
+      'total_quantity': totalQuantity,
+      'allocated_quantity': allocatedQuantity,
+      'available_quantity': availableQuantity,
+    };
   }
 }

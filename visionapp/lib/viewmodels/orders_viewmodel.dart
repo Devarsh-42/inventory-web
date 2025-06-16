@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:visionapp/viewmodels/products_viewmodel.dart';
 import '../models/orders.dart';
 import '../repositories/orders_repository.dart';
 
 class OrdersViewModel extends ChangeNotifier {
   final OrdersRepository _ordersRepository;
+  final ProductsViewModel _productsViewModel;
   List<Order> _orders = [];
   List<Order> _filteredOrders = [];
   bool _isLoading = false;
@@ -11,8 +13,11 @@ class OrdersViewModel extends ChangeNotifier {
   OrderSortOption? _currentSort;
   bool _sortAscending = true;
 
-  OrdersViewModel({OrdersRepository? ordersRepository}) 
-      : _ordersRepository = ordersRepository ?? OrdersRepository();
+  OrdersViewModel({
+    required OrdersRepository ordersRepository,
+    required ProductsViewModel productsViewModel,
+  }) : _ordersRepository = ordersRepository,
+       _productsViewModel = productsViewModel;
 
   List<Order> get orders => _orders;
   List<Order> get filteredOrders => _filteredOrders;
@@ -101,7 +106,7 @@ class OrdersViewModel extends ChangeNotifier {
 
   Future<void> updateProductCompletion(
     String orderId, 
-    String productName, 
+    String productId,  // Changed from productName
     int completedCount
   ) async {
     try {
@@ -110,7 +115,7 @@ class OrdersViewModel extends ChangeNotifier {
       }
       
       final order = _orders.firstWhere((o) => o.id == orderId);
-      final product = order.products.firstWhere((p) => p.name == productName);
+      final product = order.products.firstWhere((p) => p.productId == productId);
       
       if (completedCount > product.quantity) {
         throw Exception('Completed count cannot exceed total quantity');
@@ -118,7 +123,7 @@ class OrdersViewModel extends ChangeNotifier {
 
       await _ordersRepository.updateProductCompletion(
         orderId,
-        productName, 
+        productId,
         completedCount
       );
       
@@ -132,6 +137,9 @@ class OrdersViewModel extends ChangeNotifier {
 
   Future<void> addOrder(Order order) async {
     try {
+      _isLoading = true;
+      notifyListeners();
+
       final newOrder = Order(
         id: '',
         displayId: '',
@@ -147,7 +155,11 @@ class OrdersViewModel extends ChangeNotifier {
       
       await _ordersRepository.createOrder(newOrder);
       await loadOrders();
+
+      _isLoading = false;
+      notifyListeners();
     } catch (e) {
+      _isLoading = false;
       _error = e.toString();
       notifyListeners();
       throw e;
@@ -173,6 +185,17 @@ class OrdersViewModel extends ChangeNotifier {
       _error = e.toString();
       notifyListeners();
       throw e; // Rethrow to allow UI to handle the error
+    }
+  }
+
+  Future<void> deleteAllFinishedOrders() async {
+    try {
+      await _ordersRepository.deleteAllFinishedOrders();
+      await loadOrders(); // Reload orders to refresh the list
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      throw e;
     }
   }
 
@@ -256,5 +279,10 @@ class OrdersViewModel extends ChangeNotifier {
             order.clientId == clientId && 
             order.status == OrderStatus.completed)
         .toList();
+  }
+
+  // Add helper method to get product name
+  String getProductName(String productId) {
+    return _productsViewModel.getProductName(productId);
   }
 }

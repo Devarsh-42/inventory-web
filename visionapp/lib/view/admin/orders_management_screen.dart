@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:visionapp/core/utils/responsive_helper.dart';
 import 'package:visionapp/view/management/AddNewOrders_Screen.dart';
+import 'package:visionapp/viewmodels/products_viewmodel.dart';
 import '../../viewmodels/orders_viewmodel.dart';
 import '../../models/orders.dart';
 import '../../view/widgets/custom_button.dart';
@@ -420,51 +421,7 @@ class _OrdersManagementScreenState extends State<OrdersManagementScreen> {
                   ),
                   const SizedBox(height: 12),
                   // Products List
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.grey[50],
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey[200]!),
-                    ),
-                    padding: const EdgeInsets.all(8),
-                    child: Column(
-                      children: order.products.map((product) => Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                product.name,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[800],
-                                ),
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.blue[50],
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                '${product.completed}/${product.quantity}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.blue[700],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      )).toList(),
-                    ),
-                  ),
+                  _buildProductsList(order.products),
                   const SizedBox(height: 14),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -784,6 +741,22 @@ class _OrdersManagementScreenState extends State<OrdersManagementScreen> {
 
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}/${date.year}';
+  }
+
+  Widget _buildProductsList(List<ProductItem> products) {
+    return Consumer<ProductsViewModel>(
+      builder: (context, productsVM, _) {
+        return Column(
+          children: products.map((product) {
+            final productName = productsVM.getProductName(product.productId);
+            return ListTile(
+              title: Text(productName),
+              trailing: Text('${product.completed}/${product.quantity}'),
+            );
+          }).toList(),
+        );
+      },
+    );
   }
 }
 

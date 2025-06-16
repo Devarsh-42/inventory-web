@@ -1,9 +1,12 @@
 import 'package:flutter/foundation.dart';
-import 'package:visionapp/repositories/production_completion_repository.dart';
+import 'package:visionapp/viewmodels/products_viewmodel.dart';
 import '../models/production.dart';
 import '../repositories/production_repository.dart';
 import '../models/orders.dart'; 
 import '../repositories/orders_repository.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter/material.dart';
+import '../core/navigation/navigation_service.dart';
 
 class ProductionViewModel extends ChangeNotifier {
   final ProductionRepository _repository;
@@ -15,9 +18,11 @@ class ProductionViewModel extends ChangeNotifier {
   List<String> _productNames = ['All Products'];
   List<Order> _pendingOrders = []; // Add pendingOrders list
 
-  ProductionViewModel({ProductionRepository? repository, required ProductionCompletionRepository completionRepository})
-      : _repository = repository ?? ProductionRepository(),
-        _ordersRepository = OrdersRepository(); // Initialize OrdersRepository
+  ProductionViewModel({
+    required ProductionRepository repository,
+    required OrdersRepository ordersRepository,
+  }) : _repository = repository,
+       _ordersRepository = ordersRepository;
 
   // Getters
   bool get isLoading => _isLoading;
@@ -64,9 +69,12 @@ class ProductionViewModel extends ChangeNotifier {
   // Create new production
   Future<Production> createProduction(Production production) async {
     try {
-      final newProduction = await _repository.createProduction(production);
+      final String productionId = await _repository.createProduction(
+        production.productName,
+        production.targetQuantity
+      );
       await loadProductions(); // Refresh the list
-      return newProduction;
+      return production.copyWith(id: productionId);
     } catch (e) {
       _error = e.toString();
       notifyListeners();
@@ -79,7 +87,6 @@ class ProductionViewModel extends ChangeNotifier {
     try {
       final production = _productions.firstWhere((p) => p.id == id);
       
-      // Don't allow updates if status is ready/complete/shipped
       if (['ready', 'completed', 'shipped'].contains(production.status.toLowerCase())) {
         throw Exception('Cannot update completed or shipped productions');
       }
@@ -88,8 +95,13 @@ class ProductionViewModel extends ChangeNotifier {
       notifyListeners();
 
       await _repository.updateProduction(id, updates);
+      
+      // The database trigger will handle:
+      // 1. Updating inventory when status changes to 'completed'
+      // 2. Creating dispatch items when needed
+      // 3. Updating related order status
+      
       await loadProductions();
-
     } catch (e) {
       _error = e.toString();
       _isLoading = false;
@@ -167,13 +179,44 @@ class ProductionViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> cleanupOrphanedProductions() async {
+  Future<void> cleanupOrphanedProducts() async {
     try {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
       await _repository.cleanupOrphanedProductions();
       await loadProductions(); // Refresh list after cleanup
+
+      _isLoading = false;
+      notifyListeners();
     } catch (e) {
       _error = e.toString();
+      _isLoading = false;
       notifyListeners();
+      rethrow;
+    }
+  }
+
+  // Alias method for backward compatibility
+  Future<void> cleanupOrphanedProductions() => cleanupOrphanedProducts();
+
+  Future<void> cleanupCompletedProductions() async {
+    try {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      await _repository.cleanupCompletedProductions();
+      await loadProductions(); // Refresh list after cleanup
+
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      rethrow;
     }
   }
 
@@ -183,7 +226,7 @@ class ProductionViewModel extends ChangeNotifier {
       _isLoading = true;
       notifyListeners();
       
-      await _repository.deleteCompletedProductions();
+      await _repository.deleteAllFinishedOrders();
       await loadProductions(); // Refresh the list
       
       _isLoading = false;
@@ -249,6 +292,145 @@ class ProductionViewModel extends ChangeNotifier {
       return await _repository.getSystemAlerts();
     } catch (e) {
       throw Exception('Failed to fetch system alerts: $e');
+    }
+  }
+
+  Map<String, int> get productionQuantities {
+    final quantities = <String, int>{};
+    for (var production in _productions) {
+      if (production.status == Production.STATUS_IN_PRODUCTION) {
+        quantities[production.productName] = 
+            (quantities[production.productName] ?? 0) + production.targetQuantity;
+      }
+    }
+    return quantities;
+  }
+
+  int getProductionQuantity(String productName) {
+    return productionQuantities[productName] ?? 0;
+  }
+
+  // Update progress calculation to handle int conversion
+  int calculateProgress(Production production) {
+    if (production.targetQuantity == 0) return 0;
+    return ((production.completedQuantity / production.targetQuantity) * 100).round();
+  }
+
+  // Helper method to get items in production
+  List<Production> get inProductionItems => _productions
+      .where((p) => p.status == Production.STATUS_IN_PRODUCTION)
+      .toList();
+
+  // Add this new method
+  Map<String, Map<String, dynamic>> getProductWiseDetails() {
+    final productDetails = <String, Map<String, dynamic>>{};
+    
+    for (var prod in _productions) {
+      if (!productDetails.containsKey(prod.productName)) {
+        productDetails[prod.productName] = {
+          'total_quantity': 0,
+          'target_quantity': 0,
+          'completed_quantity': 0,
+          'orders': <Map<String, dynamic>>[],
+          'statuses': <String>{},
+        };
+      }
+      
+      final details = productDetails[prod.productName]!;
+      details['total_quantity'] += prod.targetQuantity;
+      details['target_quantity'] += prod.targetQuantity;
+      details['completed_quantity'] += prod.completedQuantity;
+      details['statuses'].add(prod.status);
+      
+      if (prod.orderId != null) {
+        // First try to get from orderDetails
+        final displayId = prod.orderDetails?['display_id'] ?? 
+                         prod.orders?['display_id'] ?? 
+                         'N/A';
+        
+        final clientName = prod.orderDetails?['client_name'] ?? 
+                          prod.orders?['client_name'] ?? 
+                          'No Client';
+        
+        details['orders'].add({
+          'production_id': prod.id,
+          'order_id': prod.orderId,
+          'display_id': displayId,
+          'client_name': clientName,
+          'quantity': prod.targetQuantity,
+          'status': prod.orderDetails?['status'] ?? 
+                   prod.orders?['status'] ?? 
+                   prod.status,
+          'priority': prod.orderDetails?['priority'] ?? 
+                     prod.orders?['priority'] ?? 
+                     'normal',
+        });
+        
+        print('Added order details for ${prod.productName}: ${details['orders'].last}');
+      }
+    }
+    
+    return productDetails;
+  }
+
+  // Add this method inside the ProductionViewModel class
+  Future<Production> addProduct(String productName, int quantity) async {
+    try {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      // Create a new production record
+      final production = Production(
+        id: '',
+        productName: productName,
+        targetQuantity: quantity,
+        completedQuantity: 0,
+        status: Production.STATUS_IN_PRODUCTION,
+        createdAt: DateTime.now(),
+        // Don't set orderId for standalone products
+      );
+
+      // Use the existing createProduction method
+      final createdProduction = await createProduction(production);
+      
+      // Update product names list
+      if (!_productNames.contains(productName)) {
+        _productNames.add(productName);
+        _productNames.sort();
+      }
+
+      _isLoading = false;
+      notifyListeners();
+      
+      return createdProduction;
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      throw Exception('Failed to add product: $e');
+    }
+  }
+
+  // Add this method to get product ID from name
+  String? getProductId(String productName) {
+    final context = NavigationService.navigatorKey.currentContext;
+    if (context == null) return null;
+    
+    final productsVM = Provider.of<ProductsViewModel>(
+      context,
+      listen: false
+    );
+    
+    try {
+      final product = productsVM.products.firstWhere(
+        (p) => p.name == productName,
+        orElse: () => throw Exception('Product not found'),
+      );
+      return product.id;
+    } catch (e) {
+      print('Error getting product ID: $e');
+      return null;
     }
   }
 }

@@ -8,10 +8,12 @@ import 'production_bottom_nav.dart';
 
 class ProductDetailsScreen extends StatefulWidget {
   final Production production;
+  final String? orderId;
   
   const ProductDetailsScreen({
     Key? key,
     required this.production,
+    this.orderId,
   }) : super(key: key);
 
   @override
@@ -19,6 +21,7 @@ class ProductDetailsScreen extends StatefulWidget {
 }
 
 class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
+  late Production _production;
   late TextEditingController _completedController;
   late String _status;
   bool get _isReadOnly => ['ready', 'completed', 'shipped'].contains(_status.toLowerCase());
@@ -26,11 +29,12 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   @override
   void initState() {
     super.initState();
-    _status = widget.production.status;
+    _production = widget.production;
+    _status = _production.status;
     // Set completed quantity equal to target if status is ready/complete/shipped
     final completedQty = _isReadOnly 
-        ? widget.production.targetQuantity 
-        : widget.production.completedQuantity;
+        ? _production.targetQuantity 
+        : _production.completedQuantity;
     _completedController = TextEditingController(text: completedQty.toString());
   }
 
@@ -73,37 +77,42 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   }
 
   Widget _buildHeader() {
-    return Row(
-      children: [
-        IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: const Icon(
-            Icons.arrow_back_ios,
-            color: Palette.whiteColor, // Updated icon color
-            size: 20,
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Palette.primaryColor,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 4,
+            offset: Offset(0, 2),
           ),
-        ),
-        Expanded(
-          child: Text(
-            'Production Details System',
-            style: TextStyle(
-              color: Palette.whiteColor, // Updated text color
-              fontSize: ResponsiveHelper.isMobile(context) ? 20 : 28,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.5,
-              shadows: [
-                Shadow(
-                  color: Palette.blackColor.withOpacity(0.2), // Updated shadow color
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+        ],
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: () => Navigator.pop(context),
+            icon: const Icon(
+              Icons.arrow_back_ios,
+              color: Palette.whiteColor,
+              size: 20,
             ),
-            textAlign: TextAlign.center,
           ),
-        ),
-        const SizedBox(width: 48),
-      ],
+          Expanded(
+            child: Text(
+              'Production Details - ${_production.productName}',
+              style: TextStyle(
+                color: Palette.whiteColor,
+                fontSize: ResponsiveHelper.isMobile(context) ? 20 : 28,
+                fontWeight: FontWeight.w700,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(width: 48),
+        ],
+      ),
     );
   }
 

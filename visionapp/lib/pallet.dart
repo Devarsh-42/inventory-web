@@ -37,6 +37,20 @@ class Palette {
   static const Color activeNavColor = Color(0xFF1E40AF); // Active navigation item
   static const Color inactiveNavColor = Color(0xFF64748B); // Inactive navigation item
 
+  static const Color readyColor = Color(0xFFF59E0B);
+  static const Color shippedColor = Color(0xFF8B5CF6);
+  static const Color defaultStatusColor = Color(0xFF6B7280);
+
+  // Progress colors
+  static const Color progressBackground = Color(0xFFF1F5F9);
+  static const Color progressGood = Color(0xFF059669);
+  static const Color progressWarning = Color(0xFFF59E0B);
+  static const Color progressDanger = Color(0xFFDC2626);
+
+
+  // Primary colors
+  static const Color primaryColor = Color(0xFF1E40AF);
+  static const Color primaryLight = Color(0xFF3B82F6);
   // Gradient colors
   static const List<Color> primaryGradient = [
     Color(0xFF1E3A8A),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:visionapp/models/orders.dart';
+import 'package:visionapp/repositories/orders_repository.dart';
 import 'package:visionapp/repositories/product_repository.dart';
-import 'package:visionapp/repositories/production_completion_repository.dart';
 import 'package:visionapp/view/admin/admin_bottom_nav.dart';
 import 'package:visionapp/viewmodels/production_viewmodel.dart';
 import 'package:visionapp/repositories/production_repository.dart';
@@ -23,8 +24,7 @@ class _ProductionManagementScreenState extends State<ProductionManagementScreen>
   void initState() {
     super.initState();
     _viewModel = ProductionViewModel(
-      repository: ProductionRepository(),
-      completionRepository: ProductionCompletionRepository(),
+      repository: ProductionRepository(), ordersRepository: OrdersRepository(),
     );
     _loadData();
   }

@@ -4,6 +4,7 @@ import 'package:visionapp/models/orders.dart';
 import 'package:visionapp/view/sales/order_placement_screen.dart';
 import 'package:visionapp/viewmodels/client_viewmodel.dart';
 import 'package:visionapp/viewmodels/orders_viewmodel.dart';
+import 'package:visionapp/viewmodels/products_viewmodel.dart';
 
 class SalesDashboardScreen extends StatefulWidget {
   const SalesDashboardScreen({Key? key}) : super(key: key);
@@ -333,7 +334,7 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
+            Text(
               'Recent Orders',
               style: TextStyle(
                 fontSize: 18,
@@ -397,112 +398,119 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
   }
 
   Widget _buildOrderCard(Order order) {
-    // Group products by name and sum their quantities
+    // Group products by ID and sum their quantities
     final Map<String, int> groupedProducts = {};
-    for (var product in order.products) {
-      groupedProducts[product.name] = (groupedProducts[product.name] ?? 0) + product.quantity;
-    }
+    
+    return Consumer<ProductsViewModel>(
+      builder: (context, productsVM, _) {
+        // Group products and get names from ProductsViewModel
+        for (var product in order.products) {
+          final productName = productsVM.getProductName(product.productId);
+          groupedProducts[productName] = (groupedProducts[productName] ?? 0) + product.quantity;
+        }
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5E7EB), width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF1E40AF).withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          // Priority indicator
-          if (order.priority == Priority.high || order.priority == Priority.urgent)
-            Positioned(
-              top: 0,
-              right: 0,
-              child: Container(
-                width: 0,
-                height: 0,
-                decoration: BoxDecoration(
-                  border: Border(
-                    top: BorderSide(
-                      width: 30,
-                      color: order.priority == Priority.urgent 
-                          ? const Color(0xFFDC2626) 
-                          : const Color(0xFFEF4444),
-                    ),
-                    right: const BorderSide(
-                      width: 30,
-                      color: Colors.transparent,
-                    ),
-                  ),
-                ),
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE5E7EB), width: 2),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF1E40AF).withOpacity(0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
               ),
-            ),
-          
-          Padding(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${order.clientName} - Order #${order.displayId}',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF111827),
-                              letterSpacing: -0.2,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Due: ${_formatDate(order.dueDate)}',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Color(0xFF6B7280),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
+            ],
+          ),
+          child: Stack(
+            children: [
+              // Priority indicator
+              if (order.priority == Priority.high || order.priority == Priority.urgent)
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: Container(
+                    width: 0,
+                    height: 0,
+                    decoration: BoxDecoration(
+                      border: Border(
+                        top: BorderSide(
+                          width: 30,
+                          color: order.priority == Priority.urgent 
+                              ? const Color(0xFFDC2626) 
+                              : const Color(0xFFEF4444),
+                        ),
+                        right: const BorderSide(
+                          width: 30,
+                          color: Colors.transparent,
+                        ),
                       ),
                     ),
+                  ),
+                ),
+              
+              Padding(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${order.clientName} - Order #${order.displayId}',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF111827),
+                                  letterSpacing: -0.2,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Due: ${_formatDate(order.dueDate)}',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Color(0xFF6B7280),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    
+                    // Updated products display
+                    Text(
+                      groupedProducts.entries
+                          .map((e) => '${e.key} (${e.value})')
+                          .join(' • '),
+                      style: TextStyle(
+                        color: const Color(0xFF6B7280),
+                        fontSize: MediaQuery.of(context).size.width < 600 ? 12 : 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    
+                    const SizedBox(height: 12),
+                    _buildStatusBadge(order.status),
                   ],
                 ),
-                const SizedBox(height: 12),
-                
-                // Update the products display
-                Text(
-                  groupedProducts.entries
-                      .map((e) => '${e.key} (${e.value})')
-                      .join(' • '),
-                  style: TextStyle(
-                    color: const Color(0xFF6B7280),
-                    fontSize: MediaQuery.of(context).size.width < 600 ? 12 : 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                
-                const SizedBox(height: 12),
-                _buildStatusBadge(order.status),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 

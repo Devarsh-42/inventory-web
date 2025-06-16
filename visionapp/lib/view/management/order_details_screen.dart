@@ -5,6 +5,7 @@ import 'package:visionapp/view/widgets/status_update_dialog.dart';
 import '../../models/orders.dart';
 import '../../viewmodels/orders_viewmodel.dart';
 import '../../viewmodels/client_viewmodel.dart';
+import '../../viewmodels/products_viewmodel.dart';
 import '../../view/widgets/alert_dialogs.dart';
 
 // Change the class to StatefulWidget
@@ -163,68 +164,73 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        ...widget.order.products.map((product) => Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  product.name,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        ...widget.order.products.map((product) => Consumer<ProductsViewModel>(
+          builder: (context, productsVM, _) {
+            final productName = productsVM.getProductName(product.productId);
+            
+            return Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: TextFormField(
-                        initialValue: product.completed.toString(),
-                        decoration: const InputDecoration(
-                          labelText: 'Completed',
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                        ),
-                        keyboardType: TextInputType.number,
-                        onChanged: (value) {
-                          final newValue = int.tryParse(value) ?? 0;
-                          if (newValue <= product.quantity) {
-                            // Update the completed value
-                            // You'll need to implement this through your view model
-                          }
-                        },
+                    Text(
+                      productName,  // Use productName instead of product.name
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    Text(
-                      'of ${product.quantity}',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            initialValue: product.completed.toString(),
+                            decoration: const InputDecoration(
+                              labelText: 'Completed',
+                              border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                            ),
+                            keyboardType: TextInputType.number,
+                            onChanged: (value) {
+                              final newValue = int.tryParse(value) ?? 0;
+                              if (newValue <= product.quantity) {
+                                _updateProductCompletion(product, newValue);
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Text(
+                          'of ${product.quantity}',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    LinearProgressIndicator(
+                      value: product.completed / product.quantity,
+                      backgroundColor: Colors.grey[200],
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        product.completed == product.quantity 
+                            ? Colors.green 
+                            : const Color(0xFF6E00FF),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                LinearProgressIndicator(
-                  value: product.completed / product.quantity,
-                  backgroundColor: Colors.grey[200],
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    product.completed == product.quantity 
-                        ? Colors.green 
-                        : const Color(0xFF6E00FF),
-                  ),
-                ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         )).toList(),
       ],
     );
@@ -501,6 +507,27 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to update status: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // Update _updateProductCompletion method
+  Future<void> _updateProductCompletion(ProductItem product, int newCount) async {
+    try {
+      await Provider.of<OrdersViewModel>(context, listen: false)
+          .updateProductCompletion(
+            widget.order.id,
+            product.productId,  // Use productId instead of name
+            newCount,
+          );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating product: $e'),
             backgroundColor: Colors.red,
           ),
         );

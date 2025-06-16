@@ -1,41 +1,44 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:visionapp/repositories/production_completion_repository.dart';
-import 'package:visionapp/view/production/production_dashboard.dart';
-import 'viewmodels/Production_queue_viewModel .dart'; // Add this import
-import 'viewmodels/completed_production_viewmodel.dart';
-import 'viewmodels/dispatch_viewmodel.dart';
+import 'package:visionapp/viewmodels/Production_queue_viewModel%20.dart';
 
 // Repository imports
-import 'package:visionapp/repositories/production_repository.dart';
-import 'package:visionapp/repositories/client_repository.dart';
-import 'package:visionapp/repositories/product_repository.dart';
-import 'package:visionapp/repositories/orders_repository.dart';
-import 'package:visionapp/repositories/production_queue_repository.dart';
-import 'package:visionapp/repositories/dispatch_repository.dart';
+import 'repositories/production_repository.dart';
+import 'repositories/client_repository.dart';
+import 'repositories/orders_repository.dart';
+import 'repositories/production_queue_repository.dart';
+import 'repositories/dispatch_repository.dart';
+import 'repositories/inventory_repository.dart';
 
 // ViewModel imports
 import 'viewmodels/authentication_viewmodel.dart';
 import 'viewmodels/orders_viewmodel.dart';
 import 'viewmodels/production_viewmodel.dart';
 import 'viewmodels/client_viewmodel.dart';
-import 'viewmodels/product_viewmodel.dart';
+import 'viewmodels/dispatch_viewmodel.dart';
+import 'viewmodels/products_viewmodel.dart';
 
 /// A centralized class that provides all ChangeNotifierProviders
 class AppProviders {
   static List<ChangeNotifierProvider> providers = [
-    // Orders provider with repository
+    // Products provider must come before OrdersViewModel
+    ChangeNotifierProvider<ProductsViewModel>(
+      create: (_) => ProductsViewModel()..loadProducts(),
+    ),
+    
+    // Orders provider with ProductsViewModel dependency
     ChangeNotifierProvider<OrdersViewModel>(
-      create: (_) => OrdersViewModel(
+      create: (context) => OrdersViewModel(
         ordersRepository: OrdersRepository(),
+        productsViewModel: Provider.of<ProductsViewModel>(context, listen: false),
       ),
     ),
     
-    // Production provider
+    // Production provider with repositories
     ChangeNotifierProvider<ProductionViewModel>(
       create: (_) => ProductionViewModel(
         repository: ProductionRepository(),
-        completionRepository: ProductionCompletionRepository(),
+        ordersRepository: OrdersRepository(),
       ),
     ),
     
@@ -45,34 +48,20 @@ class AppProviders {
         ClientRepository(),
       ),
     ),
-    
-    // Product provider
-    ChangeNotifierProvider<ProductViewModel>(
-      create: (_) => ProductViewModel(
-        repository: ProductRepository(),
-      ),
-    ),
 
-    // Add ProductionQueueViewModel provider
+    // Production Queue provider
     ChangeNotifierProvider<ProductionQueueViewModel>(
       create: (_) => ProductionQueueViewModel(
-        repository: ProductionQueueRepository(),
+        queueRepository: ProductionQueueRepository(),
+        inventoryRepository: InventoryRepository(),
       ),
     ),
 
-    // Add CompletedProductionViewModel provider
-    ChangeNotifierProvider<ProductionCompletionViewModel>(
-      create: (_) => ProductionCompletionViewModel(
-        repository: ProductionCompletionRepository(),
-      ),
-    ),
-
-    // Add DispatchViewModel provider
+    // Dispatch provider
     ChangeNotifierProvider<DispatchViewModel>(
       create: (_) => DispatchViewModel(
         repository: DispatchRepository(),
       ),
-      child: const ProductionDashboardScreen(),
     ),
   ];
 }

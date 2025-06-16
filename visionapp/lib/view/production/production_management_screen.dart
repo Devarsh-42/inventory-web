@@ -7,27 +7,23 @@ import 'package:visionapp/viewmodels/dispatch_viewmodel.dart';
 import 'package:visionapp/widgets/inventory_status_widget.dart';
 import '../../viewmodels/production_viewmodel.dart';
 import '../../models/production.dart';
-import 'add_product_screen.dart';
 import 'production_bottom_nav.dart';
 
 class ProductsScreen extends StatefulWidget {
   const ProductsScreen({Key? key}) : super(key: key);
-  
+
   @override
   State<ProductsScreen> createState() => _ProductsScreenState();
 }
 
-class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProviderStateMixin {
+class _ProductsScreenState extends State<ProductsScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ProductionViewModel>().loadProductions();
-      context.read<ProductionViewModel>().loadPendingOrders();
-    });
+    context.read<ProductionViewModel>().loadProductions();
   }
 
   @override
@@ -45,11 +41,7 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF1E3A8A),
-              Color(0xFF3B82F6),
-              Color(0xFF1E40AF),
-            ],
+            colors: [Color(0xFF1E3A8A), Color(0xFF3B82F6), Color(0xFF1E40AF)],
           ),
         ),
         child: SafeArea(
@@ -74,16 +66,24 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
                     Consumer<DispatchViewModel>(
                       builder: (context, dispatchViewModel, _) {
                         return InventoryStatusWidget(
-                          productQuantities: dispatchViewModel.productInventory,
-                          totalQuantity: dispatchViewModel.totalInventory,
-                          isExpanded: false,
+                          inventory: dispatchViewModel.productInventory,
+                          isExpanded: true,
                         );
                       },
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Manage your production orders and track progress.',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ],
                 ),
               ),
-              
+
               // Main Content
               Expanded(
                 child: Container(
@@ -170,7 +170,9 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
             LinearProgressIndicator(
               value: group.progress,
               backgroundColor: Colors.grey[200],
-              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF1E40AF)),
+              valueColor: const AlwaysStoppedAnimation<Color>(
+                Color(0xFF1E40AF),
+              ),
             ),
           ],
         ),
@@ -189,45 +191,53 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
                   ),
                 ),
                 const SizedBox(height: 8),
-                ...group.orders.map((order) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    children: [
-                      Text(
-                        '#${order.displayId}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF3B82F6),
+                ...group.orders
+                    .map(
+                      (order) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          children: [
+                            Text(
+                              '#${order.displayId}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF3B82F6),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '${order.clientName} - ${NumberFormatter.formatQuantity(order.quantity)} units',
+                                style: const TextStyle(
+                                  color: Color(0xFF4B5563),
+                                ),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _getPriorityColor(
+                                  order.priority,
+                                ).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                order.priority.toUpperCase(),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: _getPriorityColor(order.priority),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '${order.clientName} - ${NumberFormatter.formatQuantity(order.quantity)} units',
-                          style: const TextStyle(color: Color(0xFF4B5563)),
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _getPriorityColor(order.priority).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          order.priority.toUpperCase(),
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: _getPriorityColor(order.priority),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                )).toList(),
+                    )
+                    .toList(),
               ],
             ),
           ),
@@ -252,13 +262,15 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
 
       groups[prod.productName]!.productions.add(prod);
       groups[prod.productName]!.totalTargetQuantity += prod.targetQuantity;
-      groups[prod.productName]!.totalCompletedQuantity += prod.completedQuantity;
+      groups[prod.productName]!.totalCompletedQuantity +=
+          prod.completedQuantity;
 
       if (prod.orderId != null && prod.orderDetails != null) {
         // Check if order is not already added
-        final orderExists = groups[prod.productName]!.orders
-            .any((order) => order.orderId == prod.orderId);
-        
+        final orderExists = groups[prod.productName]!.orders.any(
+          (order) => order.orderId == prod.orderId,
+        );
+
         if (!orderExists) {
           groups[prod.productName]!.orders.add(
             OrderSummary(
@@ -287,349 +299,6 @@ class _ProductsScreenState extends State<ProductsScreen> with SingleTickerProvid
         return const Color(0xFF10B981);
     }
   }
-
-  Widget _buildProductionsTab() {
-    return Consumer<ProductionViewModel>(
-      builder: (context, viewModel, child) {
-        if (viewModel.isLoading) {
-          return const Center(
-            child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3B82F6)),
-            ),
-          );
-        }
-
-        if (viewModel.error != null) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.error_outline,
-                  color: Color(0xFFEF4444),
-                  size: 48,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Error: ${viewModel.error}',
-                  style: const TextStyle(
-                    color: Color(0xFFEF4444),
-                    fontSize: 16,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: () => viewModel.loadProductions(),
-                  child: const Text('Retry'),
-                ),
-              ],
-            ),
-          );
-        }
-
-        if (viewModel.productions.isEmpty) {
-          return const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.inventory_2_outlined,
-                  color: Color(0xFF9CA3AF),
-                  size: 64,
-                ),
-                SizedBox(height: 16),
-                Text(
-                  'No productions found',
-                  style: TextStyle(
-                    color: Color(0xFF6B7280),
-                    fontSize: 18,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  'Add your first production to get started',
-                  style: TextStyle(
-                    color: Color(0xFF9CA3AF),
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
-
-        return Column(
-          children: [
-            if (viewModel.hasCompletedProductions()) ...[
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: ElevatedButton.icon(
-                  onPressed: () => _showDeleteCompletedDialog(context),
-                  icon: const Icon(Icons.delete_sweep),
-                  label: const Text('Delete All Completed'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFEF4444),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: () => viewModel.loadProductions(),
-                color: const Color(0xFF3B82F6),
-                child: ListView.builder(
-                  itemCount: viewModel.productions.length,
-                  itemBuilder: (context, index) {
-                    final production = viewModel.productions[index];
-                    return ProductionCard(
-                      production: production,
-                      onEdit: () => _editProduction(production),
-                      onDelete: () => _deleteProduction(production),
-                    );
-                  },
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildPendingOrdersTab() {
-    return Consumer<ProductionViewModel>(
-      builder: (context, viewModel, child) {
-        if (viewModel.isLoading) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (viewModel.pendingOrders.isEmpty) {
-          return const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.pending_actions,
-                  size: 64,
-                  color: Color(0xFF9CA3AF),
-                ),
-                SizedBox(height: 16),
-                Text(
-                  'No pending orders',
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: Color(0xFF6B7280),
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
-
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: viewModel.pendingOrders.length,
-          itemBuilder: (context, index) {
-            final order = viewModel.pendingOrders[index];
-            return PendingOrderCard(order: order);
-          },
-        );
-      },
-    );
-  }
-
-  void _navigateToAddProduct() async {
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const AddProductScreen()),
-    );
-    
-    if (result == true) {
-      // Refresh the list if a product was added
-      context.read<ProductionViewModel>().loadProductions();
-    }
-  }
-
-  void _editProduction(Production production) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => AddProductScreen(production: production),
-      ),
-    );
-  }
-
-  void _deleteProduction(Production production) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('Delete Production'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Are you sure you want to delete "${production.productName}"?'),
-              const SizedBox(height: 16),
-              // Warning text
-              const Text(
-                'This will also delete:',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF6B7280),
-                ),
-              ),
-              const SizedBox(height: 8),
-              _buildWarningItem(
-                icon: Icons.queue,
-                text: 'All queue entries for this production',
-              ),
-              _buildWarningItem(
-                icon: Icons.done_all,
-                text: 'All completion records',
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFF6B7280),
-              ),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                Navigator.pop(context);
-                try {
-                  await context.read<ProductionViewModel>().deleteProduction(production.id);
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Production deleted successfully'),
-                        backgroundColor: Color(0xFF10B981),
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Error deleting production: $e'),
-                        backgroundColor: const Color(0xFFEF4444),
-                      ),
-                    );
-                  }
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFEF4444),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text('Delete'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildWarningItem({required IconData icon, required String text}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Icon(
-            icon,
-            size: 16,
-            color: const Color(0xFF9CA3AF),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(
-                color: Color(0xFF6B7280),
-                fontSize: 14,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _shipProduction(Production production) {
-    // Handle shipping logic
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Shipping ${production.productName}...')),
-    );
-  }
-
-  void _showDeleteCompletedDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Completed Productions'),
-        content: const Text(
-          'Are you sure you want to delete all completed productions? This action cannot be undone.'
-        ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            onPressed: () async {
-              try {
-                final viewModel = Provider.of<ProductionViewModel>(context, listen: false);
-                Navigator.pop(context);
-                await viewModel.deleteCompletedProductions();
-                
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Completed productions deleted successfully'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Error deleting productions: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
-            },
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class ProductionCard extends StatelessWidget {
@@ -651,10 +320,11 @@ class ProductionCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border.all(
-          color: production.isCompleted 
-              ? const Color(0xFF10B981) 
-              : const Color(0xFFF1F5F9),
-          width: 2
+          color:
+              production.isCompleted
+                  ? const Color(0xFF10B981)
+                  : const Color(0xFFF1F5F9),
+          width: 2,
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
@@ -703,13 +373,17 @@ class ProductionCard extends StatelessWidget {
                   children: [
                     _buildActionButton('Edit', const Color(0xFF3B82F6), onEdit),
                     const SizedBox(width: 6),
-                    _buildActionButton('Delete', const Color(0xFFEF4444), onDelete),
+                    _buildActionButton(
+                      'Delete',
+                      const Color(0xFFEF4444),
+                      onDelete,
+                    ),
                   ],
                 ),
               ],
             ),
             const SizedBox(height: 14),
-            
+
             // Progress Bar
             Container(
               height: 6,
@@ -730,16 +404,13 @@ class ProductionCard extends StatelessWidget {
                 ),
               ),
             ),
-            
+
             const SizedBox(height: 6),
-            
+
             // Progress Text
             Text(
               'Completed: ${production.completedQuantity} / ${production.targetQuantity} units',
-              style: const TextStyle(
-                fontSize: 12,
-                color: Color(0xFF6B7280),
-              ),
+              style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
             ),
             const SizedBox(height: 8),
             // Status Badge
@@ -781,9 +452,7 @@ class ProductionCard extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         minimumSize: Size.zero,
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         elevation: 4,
         shadowColor: color.withOpacity(0.2),
       ),
@@ -801,18 +470,29 @@ class ProductionCard extends StatelessWidget {
   LinearGradient _getStatusGradient(String status) {
     switch (status.toLowerCase()) {
       case 'completed':
-        return const LinearGradient(colors: [Color(0xFF059669), Color(0xFF10B981)]);
-      case 'in-progress':
+        return const LinearGradient(
+          colors: [Color(0xFF059669), Color(0xFF10B981)],
+        );
       case 'in_progress':
-        return const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFFBBF24)]);
+        return const LinearGradient(
+          colors: [Color(0xFFF59E0B), Color(0xFFFBBF24)],
+        );
       case 'paused':
-        return const LinearGradient(colors: [Color(0xFFDC2626), Color(0xFFEF4444)]);
+        return const LinearGradient(
+          colors: [Color(0xFFDC2626), Color(0xFFEF4444)],
+        );
       case 'ready':
-        return const LinearGradient(colors: [Color(0xFF7C3AED), Color(0xFF8B5CF6)]);
+        return const LinearGradient(
+          colors: [Color(0xFF7C3AED), Color(0xFF8B5CF6)],
+        );
       case 'shipped':
-        return const LinearGradient(colors: [Color(0xFF4B5563), Color(0xFF6B7280)]);
+        return const LinearGradient(
+          colors: [Color(0xFF4B5563), Color(0xFF6B7280)],
+        );
       default: // queued
-        return const LinearGradient(colors: [Color(0xFF1E40AF), Color(0xFF3B82F6)]);
+        return const LinearGradient(
+          colors: [Color(0xFF1E40AF), Color(0xFF3B82F6)],
+        );
     }
   }
 
@@ -842,133 +522,5 @@ class ProductionCard extends StatelessWidget {
       default:
         return status.toUpperCase();
     }
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.month}/${date.day}';
-  }
-}
-
-class PendingOrderCard extends StatelessWidget {
-  final Order order;
-
-  const PendingOrderCard({
-    Key? key,
-    required this.order,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(
-                  '#${order.displayId}',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF3B82F6),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  order.clientName,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const Spacer(),
-                _buildPriorityBadge(order.priority),
-              ],
-            ),
-            const SizedBox(height: 12),
-            ...order.products.map((product) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                children: [
-                  const Icon(Icons.inventory_2, size: 16, color: Color(0xFF6B7280)),
-                  const SizedBox(width: 8),
-                  Text(
-                    product.name,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF374151),
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    'Qty: ${product.quantity}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: Color(0xFF6B7280),
-                    ),
-                  ),
-                ],
-              ),
-            )),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                const Icon(Icons.calendar_today, size: 16, color: Color(0xFF6B7280)),
-                const SizedBox(width: 8),
-                Text(
-                  'Due: ${_formatDate(order.dueDate)}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF6B7280),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPriorityBadge(Priority priority) {
-    Color color;
-    switch (priority) {
-      case Priority.urgent:
-        color = const Color(0xFFDC2626);
-        break;
-      case Priority.high:
-        color = const Color(0xFFF59E0B);
-        break;
-      default:
-        color = const Color(0xFF10B981);
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color),
-      ),
-      child: Text(
-        priority.toString().split('.').last.toUpperCase(),
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          color: color,
-        ),
-      ),
-    );
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.month}/${date.day}/${date.year}';
   }
 }

@@ -1,11 +1,12 @@
 // models/production_batch.dart
 import 'package:uuid/uuid.dart';
 import 'package:visionapp/models/production.dart';
+import 'package:visionapp/models/inventory.dart';
 
-class ProductionBatch {
+class ProductionQueue {
   final String id;
   final String batchNumber;
-  final String productionId;
+  final String inventoryId; // Changed from productionId
   final String status;
   final double progress;
   final DateTime createdAt;
@@ -18,10 +19,10 @@ class ProductionBatch {
     'paused'
   ];
 
-  ProductionBatch({
+  ProductionQueue({
     String? id,
     required this.batchNumber,
-    required this.productionId,
+    required this.inventoryId, // Changed from productionId
     String? status,
     this.progress = 0.0,
     DateTime? createdAt,
@@ -41,11 +42,11 @@ class ProductionBatch {
     }
   }
 
-  factory ProductionBatch.fromJson(Map<String, dynamic> json) {
-    return ProductionBatch(
+  factory ProductionQueue.fromJson(Map<String, dynamic> json) {
+    return ProductionQueue(
       id: json['id'],
       batchNumber: json['batch_number'],
-      productionId: json['production_id'],
+      inventoryId: json['inventory_id'], // Changed from productionId
       status: json['status'],
       progress: (json['progress'] ?? 0.0).toDouble(),
       createdAt: DateTime.parse(json['created_at']),
@@ -57,7 +58,7 @@ class ProductionBatch {
     return {
       'id': id,
       'batch_number': batchNumber,
-      'production_id': productionId,
+      'inventory_id': inventoryId, // Changed from productionId
       'status': status,
       'progress': progress,
       'created_at': createdAt.toIso8601String(),
@@ -84,49 +85,58 @@ class ProductionBatch {
 // models/production_queue_item.dart
 class ProductionQueueItem {
   final String id;
-  final String productionId;
+  final String inventoryId;
   final int queuePosition;
   final int quantity;
-  final Production production;
-  final ProductionBatch? batch;
+  final bool completed;
   final DateTime createdAt;
   final DateTime updatedAt;
-  final bool completed;
-  final String displayName;
-  final String status;
+  final Inventory? inventory;
 
   ProductionQueueItem({
     String? id,
-    required this.productionId,
+    required this.inventoryId,
     required this.queuePosition,
     required this.quantity,
-    required this.production,
-    this.batch,
+    this.completed = false,
     DateTime? createdAt,
     DateTime? updatedAt,
-    this.completed = false,
-    required this.displayName,
-    this.status = 'pending',
+    this.inventory,
   }) : 
     this.id = id ?? const Uuid().v4(),
     this.createdAt = createdAt ?? DateTime.now(),
     this.updatedAt = updatedAt ?? DateTime.now();
 
   factory ProductionQueueItem.fromJson(Map<String, dynamic> json) {
+    if (json == null) throw ArgumentError('json cannot be null');
+    
     return ProductionQueueItem(
-      id: json['id'],
-      productionId: json['production_id'],
-      queuePosition: json['queue_position'],
-      quantity: json['quantity'],
-      production: Production.fromJson(json['production']),
-      batch: json['batch'] != null ? ProductionBatch.fromJson(json['batch']) : null,
-      createdAt: DateTime.parse(json['created_at']),
-      updatedAt: DateTime.parse(json['updated_at']),
+      id: json['id']?.toString() ?? const Uuid().v4(),
+      inventoryId: json['inventory_id']?.toString() ?? '',
+      queuePosition: (json['queue_position'] ?? 0) as int,
+      quantity: (json['quantity'] ?? 0) as int,
       completed: json['completed'] ?? false,
-      displayName: json['display_name'] ?? json['production']['product_name'],
-      status: json['status'] ?? 'pending',
+      createdAt: json['created_at'] != null 
+          ? DateTime.parse(json['created_at'].toString()) 
+          : DateTime.now(),
+      updatedAt: json['updated_at'] != null 
+          ? DateTime.parse(json['updated_at'].toString()) 
+          : DateTime.now(),
+      inventory: json['inventory'] != null 
+          ? Inventory.fromJson(Map<String, dynamic>.from(json['inventory'])) 
+          : null,
     );
   }
 
-  bool get isCompleted => completed;
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'inventory_id': inventoryId,
+      'queue_position': queuePosition,
+      'quantity': quantity,
+      'completed': completed,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
+    };
+  }
 }

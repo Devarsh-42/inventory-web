@@ -11,12 +11,57 @@ class ProductionRepository {
     try {
       final response = await _supabaseService.client
           .from(_tableName)
+          .select('''
+            *,
+            orders:orders!left(
+              id,
+              display_id,
+              client_name,
+              client_id,
+              due_date,
+              priority,
+              status
+            )
+          ''')
+          .order('created_at', ascending: false);
+
+      print('Raw response: $response'); // Debug print
+
+      return (response as List).map((data) {
+        // Map order details directly from the orders object
+        if (data['orders'] != null) {
+          data['order_details'] = {
+            'display_id': data['orders']['display_id'],
+            'client_name': data['orders']['client_name'],
+            'client_id': data['orders']['client_id'],
+            'order_id': data['orders']['id'],
+            'due_date': data['orders']['due_date'],
+            'priority': data['orders']['priority'],
+            'status': data['orders']['status'],
+          };
+        }
+        
+        // Keep the original orders data as well
+        data['orders'] = data['orders'];
+        
+        print('Mapped data for ${data['product_name']}: ${data['order_details']}'); // Debug print
+        
+        return Production.fromJson(data);
+      }).toList();
+    } catch (e) {
+      print('Error fetching productions: $e');
+      throw Exception('Failed to fetch productions: $e');
+    }
+  }
+
+    Future<List<Map<String, dynamic>>> getProductions() async {
+    try {
+      final response = await _supabaseService.client
+          .from('productions')
           .select()
           .order('created_at', ascending: false);
 
-      return (response as List)
-          .map((data) => Production.fromJson(data))
-          .toList();
+      return List<Map<String, dynamic>>.from(response as List);
     } catch (e) {
       throw Exception('Failed to fetch productions: $e');
     }
@@ -38,6 +83,10 @@ class ProductionRepository {
 
   Future<List<Production>> getProductionsByStatus(String status) async {
     try {
+      if (!Production.isValidStatus(status)) {
+        throw ArgumentError('Invalid status: $status');
+      }
+
       final response = await _supabaseService.client
           .from(_tableName)
           .select()
@@ -52,34 +101,52 @@ class ProductionRepository {
     }
   }
 
+  // Update method to use database function
   Future<void> updateProduction(String id, Map<String, dynamic> updates) async {
     try {
       await _supabaseService.client
           .from(_tableName)
           .update(updates)
           .eq('id', id);
+          
+      // Database triggers will handle:
+      // - Inventory updates
+      // - Dispatch item creation
+      // - Order status updates
     } catch (e) {
       throw Exception('Failed to update production: $e');
     }
   }
 
-  Future<Production> createProduction(Production production) async {
+  Future<List<Production>> getInProductionItems() async {
     try {
-      final data = {
-        'product_name': production.productName,
-        'target_quantity': production.targetQuantity,
-        'completed_quantity': 0,
-        'status': 'queued', // Always start with queued status
-        'order_id': production.orderId,
-      };
+      final response = await _supabaseService.client
+          .from(_tableName)
+          .select()
+          .eq('status', Production.STATUS_IN_PRODUCTION);
 
+      return (response as List)
+          .map((json) => Production.fromJson(json))
+          .toList();
+    } catch (e) {
+      throw Exception('Failed to get in-production items: $e');
+    }
+  }
+
+  Future<String> createProduction(String productName, int targetQuantity) async {
+    try {
       final response = await _supabaseService.client
           .from('productions')
-          .insert(data)
+          .insert({
+            'product_name': productName,
+            'target_quantity': targetQuantity,
+            'completed_quantity': 0,
+            'status': 'in_production'
+          })
           .select()
           .single();
 
-      return Production.fromJson(response);
+      return response['id'] as String;
     } catch (e) {
       throw Exception('Failed to create production: $e');
     }
@@ -113,9 +180,9 @@ class ProductionRepository {
           .delete()
           .eq('production_id', id);
 
-      // Then delete all production completions
+      // Delete related inventory
       await _supabaseService.client
-          .from('production_completions')
+          .from('inventory')
           .delete()
           .eq('production_id', id);
 
@@ -145,139 +212,108 @@ class ProductionRepository {
 
   Future<List<Production>> getUnqueuedProductions() async {
     try {
-      // First get all queued quantities
-      final queueResponse = await _supabaseService.client
-          .from('production_queue')
-          .select('production_id, quantity');
-      
-      // Sum up queued quantities by production_id
-      Map<String, int> queuedQuantities = {};
-      for (final item in (queueResponse as List)) {
-        final prodId = item['production_id'] as String;
-        final quantity = item['quantity'] as int? ?? 0; // Handle null quantity
-        queuedQuantities[prodId] = (queuedQuantities[prodId] ?? 0) + quantity;
-      }
-
-      // Get all active productions
       final response = await _supabaseService.client
           .from('productions')
-          .select()
-          .neq('status', 'completed');
+          .select('''
+            *,
+            orders!left (
+              display_id,
+              client_name,
+              client_id,
+              due_date,
+              priority
+            ),
+            production_queue(quantity)
+          ''')
+          .eq('status', Production.STATUS_IN_PRODUCTION);
 
-      // Filter and transform productions
-      return (response as List)
-          .map((json) => Production.fromJson(json))
-          .where((prod) {
-            final queuedQty = queuedQuantities[prod.id] ?? 0;
-            return queuedQty < prod.targetQuantity; // Only include productions with remaining quantity
-          })
-          .map((prod) {
-            final queuedQty = queuedQuantities[prod.id] ?? 0;
-            return prod.copyWith(
-              availableQuantity: prod.targetQuantity - queuedQty
-            );
-          })
-          .toList();
+      return (response as List).map((json) {
+        // Calculate queued quantity
+        final queuedQuantity = (json['production_queue'] as List?)?.fold<int>(
+          0,
+          (sum, queue) => sum + (queue['quantity'] as int? ?? 0)
+        ) ?? 0;
+
+        // Map order details
+        if (json['orders'] != null) {
+          json['order_details'] = {
+            'display_id': json['orders']['display_id'],
+            'client_name': json['orders']['client_name'],
+            'client_id': json['orders']['client_id'],
+            'due_date': json['orders']['due_date'],
+            'priority': json['orders']['priority'],
+          };
+        }
+
+        final production = Production.fromJson(json);
+        
+        if (queuedQuantity < production.targetQuantity) {
+          return production.copyWith(
+            availableQuantity: production.targetQuantity - queuedQuantity
+          );
+        }
+        return null;
+      })
+      .where((prod) => prod != null)
+      .cast<Production>()
+      .toList();
     } catch (e) {
-      print('Error in getUnqueuedProductions: $e'); // Add logging
+      print('Error in getUnqueuedProductions: $e');
       throw Exception('Failed to fetch unqueued productions: $e');
     }
   }
 
   Future<void> cleanupOrphanedProductions() async {
     try {
-      // Delete productions with null order_id that aren't in queue
-      await _supabaseService.client
-          .from(_tableName)
-          .delete()
-          .filter('order_id', 'is', null)  // Changed from is_('order_id', null)
-          .not('id', 'in', (
-            _supabaseService.client
-                .from('production_queue')
-                .select('production_id')
-          ));
+      await _supabaseService.client.rpc(
+        'cleanup_orphaned_productions',
+        params: {
+          'status_list': ['completed', 'ready', 'shipped']
+        }
+      );
     } catch (e) {
+      print('Error cleaning up orphaned productions: $e'); // Debug logging
       throw Exception('Failed to cleanup orphaned productions: $e');
     }
   }
 
-  // Add this method to ProductionRepository class
-  Future<void> deleteCompletedProductions() async {
+  Future<void> cleanupCompletedProductions() async {
     try {
-      // First, get all completed productions
-      final completedProds = await _supabaseService.client
-          .from('productions')
-          .select('id')
-          .eq('status', 'completed');
-
-      for (var prod in completedProds) {
-        final productionId = prod['id'];
-
-        // Check if any completion records are referenced in dispatch_items
-        final completions = await _supabaseService.client
-            .from('production_completions')
-            .select('id')
-            .eq('production_id', productionId);
-
-        for (var completion in completions) {
-          // Check if this completion is referenced in dispatch_items
-          final dispatchItemsCheck = await _supabaseService.client
-              .from('dispatch_items')
-              .select('id')
-              .eq('completed_production_id', completion['id']);
-
-          // Only delete if not referenced in dispatch_items
-          if ((dispatchItemsCheck as List).isEmpty) {
-            await _supabaseService.client
-                .from('production_completions')
-                .delete()
-                .eq('id', completion['id']);
-          }
-        }
-
-        // Check if this production has any items in the queue
-        final queueCheck = await _supabaseService.client
-            .from('production_queue')
-            .select('id')
-            .eq('production_id', productionId);
-
-        // Delete from queue if exists
-        if ((queueCheck as List).isNotEmpty) {
-          await _supabaseService.client
-              .from('production_queue')
-              .delete()
-              .eq('production_id', productionId);
-        }
-
-        // Check if this production can be deleted
-        final dispatchItemsCheck = await _supabaseService.client
-            .from('dispatch_items')
-            .select('id')
-            .eq('production_id', productionId);
-
-        // Only delete the production if it's not referenced in dispatch_items
-        if ((dispatchItemsCheck as List).isEmpty) {
-          await _supabaseService.client
-              .from('productions')
-              .delete()
-              .eq('id', productionId);
-        }
-      }
+      await _supabaseService.client.rpc(
+        'cleanup_completed_productions'
+      );
     } catch (e) {
-      print('Error deleting completed productions: $e');
-      throw Exception('Failed to delete completed productions: $e');
+      print('Error cleaning up completed productions: $e'); // Debug logging
+      throw Exception('Failed to cleanup completed productions: $e');
     }
   }
 
-  Future<void> updateProductionWithQueue(String productionId, String queueId, int completedQuantity) async {
+  // Add this method to ProductionRepository class
+  Future<void> deleteAllFinishedOrders() async {
+    try {
+      await _supabaseService.client.rpc(
+        'delete_finished_orders',
+        params: {
+          'status_list': ['completed', 'ready', 'shipped']
+        }
+      );
+    } catch (e) {
+      throw Exception('Failed to delete finished orders: $e');
+    }
+  }Future<void> updateProductionWithQueue(String productionId, String queueId, int completedQuantity) async {
     try {
       // Use a stored procedure to handle the transaction
       await _supabaseService.client
-          .rpc('update_production_and_queue', params: {
+          .rpc('update_production_and_inventory', params: {
             'p_production_id': productionId,
             'p_queue_id': queueId,
             'p_completed_quantity': completedQuantity,
           });
+          
+      // The stored procedure will:
+      // 1. Update production completed_quantity
+      // 2. Update inventory available_qty
+      // 3. Mark queue item as completed
     } catch (e) {
       throw Exception('Failed to update production status: $e');
     }

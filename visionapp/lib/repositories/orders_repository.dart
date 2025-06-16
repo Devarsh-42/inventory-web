@@ -8,7 +8,7 @@ class OrdersRepository {
 
   OrdersRepository() : _supabaseService = SupabaseService.instance;
 
-  Future<List<Order>> getAllOrders() async {
+ Future<List<Order>> getAllOrders() async {
     try {
       final response = await _supabaseService.client
           .from(_tableName)
@@ -24,43 +24,45 @@ class OrdersRepository {
     }
   }
 
-  Future<Order> createOrder(Order order) async {
+    Future<Order> createOrder(Order order) async {
     try {
-      final response = await _supabaseService.client.rpc('create_order_with_productions', 
-        params: {
-          'order_data': {
+      // Insert the order first
+      final orderResponse = await _supabaseService.client
+          .from(_tableName)
+          .insert({
             'client_id': order.clientId,
             'client_name': order.clientName,
             'due_date': order.dueDate.toIso8601String(),
-            'created_date': order.createdDate.toIso8601String(),
-            'status': 'in_production', // Always start with in_production
-            'priority': order.priority.toString().split('.').last,
+            'status': order.status.toString().split('.').last.toLowerCase(),
+            'priority': order.priority.toString().split('.').last.toLowerCase(),
             'special_instructions': order.specialInstructions,
-          },
-          'products_data': order.products.map((product) => ({
-            'name': product.name,
-            'quantity': product.quantity,
-            'completed': 0,
-          })).toList(),
-        }
-      );
-
-      final completeOrder = await _supabaseService.client
-          .from(_tableName)
-          .select('''
-            *,
-            products:$_productsTable(*)
-          ''')
-          .eq('id', response['id'])
+            'created_date': DateTime.now().toIso8601String(),
+          })
+          .select()
           .single();
 
-      return Order.fromJson(completeOrder);
+      // Insert order products
+      final productsData = order.products.map((product) => {
+        'order_id': orderResponse['id'],
+        'product_id': product.productId,
+        'quantity': product.quantity,
+        'completed': product.completed,
+      }).toList();
+
+      await _supabaseService.client.from(_productsTable).insert(productsData);
+
+      // Return the created order with its products
+      return Order.fromJson({
+        ...orderResponse,
+        'products': productsData,
+      });
     } catch (e) {
       throw Exception('Failed to create order: $e');
     }
   }
 
-  Future<void> deleteOrder(String orderId) async {
+
+Future<void> deleteOrder(String orderId) async {
     try {
       await _supabaseService.client
           .from(_tableName)
@@ -88,7 +90,7 @@ class OrdersRepository {
 
   Future<void> updateProductCompletion(
     String orderId,
-    String productName,
+    String productId,  // Changed from productName
     int completedCount,
   ) async {
     try {
@@ -96,7 +98,7 @@ class OrdersRepository {
           .from('order_products')
           .update({'completed': completedCount})
           .eq('order_id', orderId)
-          .eq('name', productName);
+          .eq('product_id', productId);  // Changed from name to product_id
     } catch (e) {
       throw Exception('Failed to update product completion: $e');
     }
@@ -123,7 +125,7 @@ class OrdersRepository {
               .from(_productsTable)
               .insert({
                 'order_id': orderResponse['id'],
-                'name': product.name,
+                'product_id': product.productId,
                 'quantity': product.quantity,
                 'completed': 0, // Reset completed count
               });
@@ -176,7 +178,7 @@ class OrdersRepository {
               .from(_productsTable)
               .insert({
                 'order_id': order.id,
-                'name': product.name,
+                'product_id': product.productId,  // Changed from name
                 'quantity': product.quantity,
                 'completed': product.completed,
               });
@@ -307,6 +309,19 @@ class OrdersRepository {
       );
     } catch (e) {
       throw Exception('Failed to update product quantity: $e');
+    }
+  }
+
+  Future<void> deleteAllFinishedOrders() async {
+    try {
+      await _supabaseService.client.rpc(
+        'delete_finished_orders',
+        params: {
+          'status_list': ['completed', 'ready', 'shipped']
+        }
+      );
+    } catch (e) {
+      throw Exception('Failed to delete finished orders: $e');
     }
   }
 }

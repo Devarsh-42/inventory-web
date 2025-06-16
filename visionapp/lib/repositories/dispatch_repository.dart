@@ -1,3 +1,5 @@
+import 'package:visionapp/models/inventory.dart';
+
 import '../core/services/supabase_services.dart';
 import '../models/dispatch.dart';
 
@@ -32,51 +34,92 @@ class DispatchRepository {
           .map((item) => DispatchItem.fromJson(item))
           .toList();
     } catch (e) {
-      print('Error fetching dispatch items: $e'); // Add logging
+      print('Error fetching dispatch items: $e');
       throw Exception('Failed to fetch dispatch items: $e');
+    }
+  }
+
+  // Update allocateToDispatch method to remove explicit transaction management
+ Future<void> allocateToDispatch(
+    String dispatchItemId,
+    String inventoryId,
+    int quantity,
+  ) async {
+    try {
+      await _supabaseService.client.rpc(
+        'allocate_inventory_to_dispatch',
+        params: {
+          'p_dispatch_item_id': dispatchItemId,
+          'p_inventory_id': inventoryId,
+          'p_quantity': quantity,
+        },
+      );
+    } catch (e) {
+      throw Exception('Failed to allocate to dispatch: $e');
+    }
+  }
+
+  // Update updateDispatchItemAllocation method
+// dispatch_repository.dart (FIXED)
+Future<void> updateDispatchItemAllocation(
+  String itemId,
+  int allocatedQuantity,
+  String inventoryId,
+) async {
+  try {
+    // Use the correct RPC for inventory allocation
+    await _supabaseService.client.rpc(
+      'allocate_inventory_to_dispatch',
+      params: {
+        'p_dispatch_item_id': itemId,
+        'p_inventory_id': inventoryId,
+        'p_quantity': allocatedQuantity,
+      },
+    );
+
+    // Explicitly update allocated quantity on dispatch_items
+    await _supabaseService.client
+      .from('dispatch_items')
+      .update({
+        'allocated_quantity': allocatedQuantity
+      })
+      .eq('id', itemId);
+  } catch (e) {
+    throw Exception('Failed to update dispatch item allocation: $e');
+  }
+}
+
+
+  // Update shipDispatch method
+  Future<void> shipDispatch(
+    String dispatchId, {
+    required String shipmentDetails,
+  }) async {
+    try {
+      // Single RPC call to handle shipping update
+      await _supabaseService.client.rpc(
+        'ship_dispatch',
+        params: {
+          'p_dispatch_id': dispatchId,
+          'p_shipment_details': shipmentDetails,
+        },
+      );
+    } catch (e) {
+      print('Error shipping dispatch: $e');
+      throw Exception('Failed to ship dispatch: $e');
     }
   }
 
   Future<void> markAsShipped(String clientId, List<String> orderIds) async {
     try {
-      // Start a transaction
-      await _supabaseService.client.rpc('begin_transaction');
-
-      final timestamp = DateTime.now().toIso8601String();
-
-      // Update completed_productions
-      await _supabaseService.client
-          .from('production_completions')
-          .update({
-            'shipped': true,
-            'shipping_date': timestamp,
-          })
-          .filter('order_id', 'in', orderIds)
-          .eq('shipped', false);
-
-      // Insert into dispatch table for each order
-      final dispatchData = orderIds.map((orderId) => ({
-        'order_id': orderId,
-        'client_id': clientId,
-        'status': 'shipped',
-        'dispatch_date': timestamp,
-        'created_at': timestamp,
-        'updated_at': timestamp,
-        'shipping_notes': 'Automatically marked as shipped from dispatch screen'
-      })).toList();
-
-      // Batch insert dispatch entries
-      await _supabaseService.client
-          .from('dispatch')
-          .upsert(
-            dispatchData,
-            onConflict: 'order_id',  // If entry exists, update it
-          );
-
-      await _supabaseService.client.rpc('commit_transaction');
+      await _supabaseService.client.rpc(
+        'mark_orders_as_shipped',
+        params: {
+          'p_client_id': clientId,
+          'p_order_ids': orderIds,
+        },
+      );
     } catch (e) {
-      await _supabaseService.client.rpc('rollback_transaction');
-      print('Error marking as shipped: $e');
       throw Exception('Failed to mark as shipped: $e');
     }
   }
@@ -223,42 +266,7 @@ class DispatchRepository {
       throw Exception('Failed to mark item ready: $e');
     }
   }
-
-  // Update the shipDispatch method
-  Future<void> shipDispatch(
-    String dispatchId, {
-    required String shipmentDetails,
-  }) async {
-    try {
-      final now = DateTime.now().toIso8601String();
-      
-      // Update dispatch status first
-      await _supabaseService.client
-          .from('dispatch')
-          .update({
-            'status': 'shipped',
-            'shipped_on': now,
-            'shipping_notes': shipmentDetails, // Store shipment details
-          })
-          .eq('id', dispatchId);
-
-      // Then update all dispatch items
-      await _supabaseService.client
-          .from('dispatch_items')
-          .update({
-            'shipped': true,
-            'shipped_date': now,
-          })
-          .eq('dispatch_id', dispatchId);
-
-    } catch (e) {
-      print('Error shipping dispatch: $e');
-      throw Exception('Failed to ship dispatch: $e');
-    }
-  }
-
-  // Add this method to DispatchRepository class
-  Future<void> deleteShippedDispatch(String dispatchId) async {
+Future<void> deleteShippedDispatch(String dispatchId) async {
     try {
       // First check if dispatch exists and is shipped
       final dispatchResponse = await _supabaseService.client
@@ -292,49 +300,27 @@ class DispatchRepository {
       throw Exception('Failed to delete shipped dispatch: $e');
     }
   }
-
-  // Add to DispatchRepository class
-  Future<Map<String, dynamic>> getInventoryStatus() async {
+ Future<Map<String, InventoryStatusData>> getInventoryStatus() async {
     try {
-      // Get all completed productions that aren't shipped
-      final completedProds = await _supabaseService.client
-          .from('production_completions')
-          .select('product_name, quantity_completed, shipped')
-          .eq('shipped', false);
+      final response = await _supabaseService.client
+          .from('inventory_status') // Use the view instead
+          .select()
+          .order('product_name');
 
-      // Get all shipped dispatch items to subtract from total
-      final shippedItems = await _supabaseService.client
-          .from('dispatch_items')
-          .select('product_name, quantity')
-          .eq('shipped', true);
-
-      final Map<String, int> products = {};
-      int total = 0;
-
-      // Add completed productions
-      for (var prod in completedProds) {
-        final productName = prod['product_name'];
-        final quantity = prod['quantity_completed'] as int;
-        
-        products[productName] = (products[productName] ?? 0) + quantity;
-        total += quantity;
+      final inventory = <String, InventoryStatusData>{};
+      
+      for (final item in response as List) {
+        final productName = item['product_name'] as String;
+        inventory[productName] = InventoryStatusData(
+          productName: productName,
+          completionId: item['id'],
+          totalQuantity: item['total_quantity'] ?? 0,
+          availableQuantity: item['available_qty'] ?? 0,
+          allocatedQuantity: item['allocated_qty'] ?? 0,
+        );
       }
 
-      // Subtract shipped quantities
-      for (var item in shippedItems) {
-        final productName = item['product_name'];
-        final quantity = item['quantity'] as int;
-        
-        if (products.containsKey(productName)) {
-          products[productName] = (products[productName] ?? 0) - quantity;
-          total -= quantity;
-        }
-      }
-
-      return {
-        'products': products,
-        'total': total,
-      };
+      return inventory;
     } catch (e) {
       throw Exception('Failed to get inventory status: $e');
     }
@@ -372,6 +358,39 @@ class DispatchRepository {
       }
     } catch (e) {
       throw Exception('Failed to delete shipped items: $e');
+    }
+  }
+
+  // Add these methods to the DispatchRepository class
+  Future<Map<String, dynamic>> checkInventoryAvailability(
+    String productName,
+    int quantity
+  ) async {
+    try {
+      final response = await _supabaseService.client
+          .from('inventory_status')
+          .select()
+          .eq('product_name', productName)
+          .single();
+
+      if (response == null) {
+        return {
+          'available': false,
+          'message': 'No inventory found'
+        };
+      }
+
+      final available = response['available_qty'] as int;
+      final current = available - (response['allocated_qty'] as int);
+
+      return {
+        'available': current >= quantity,
+        'message': current >= quantity ? 
+          'Sufficient inventory' : 
+          'Insufficient inventory ($current available)'
+      };
+    } catch (e) {
+      throw Exception('Failed to check inventory availability: $e');
     }
   }
 }

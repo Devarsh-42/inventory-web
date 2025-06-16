@@ -1,7 +1,8 @@
 // lib/views/admin/order_placement_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:visionapp/viewmodels/product_viewmodel.dart';
+import 'package:visionapp/viewmodels/production_viewmodel.dart';
+import 'package:visionapp/viewmodels/products_viewmodel.dart';
 import '../../viewmodels/orders_viewmodel.dart';
 import '../../viewmodels/client_viewmodel.dart';
 import '../../models/orders.dart'; // This contains the ProductItem class
@@ -42,7 +43,7 @@ class _Sales_AddOrderScreenState extends State<Sales_AddOrderScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<ClientViewModel>(context, listen: false).loadClients();
-      Provider.of<ProductViewModel>(context, listen: false).loadProductNames(); // Changed this line
+      Provider.of<ProductsViewModel>(context, listen: false).loadProducts(); // Changed this line
       _initializeForm();
     });
   }
@@ -303,56 +304,63 @@ class _Sales_AddOrderScreenState extends State<Sales_AddOrderScreen> {
     );
   }
 
+  // Update _buildProductItem method
   Widget _buildProductItem(ProductItem product, int index) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+    return Consumer<ProductsViewModel>(
+      builder: (context, productsVM, _) {
+        final productName = productsVM.getProductName(product.productId);
+        
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: const Color(0xFFE5E7EB)),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.02),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  product.name,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF111827),
-                  ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      productName,  // Use productName instead of product.name
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF111827),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Quantity: ${product.quantity} units',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF6B7280),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Quantity: ${product.quantity} units',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF6B7280),
-                  ),
+              ),
+              IconButton(
+                onPressed: () => _removeProduct(index),
+                icon: const Icon(
+                  Icons.remove_circle_outline,
+                  color: Color(0xFFEF4444),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          IconButton(
-            onPressed: () => _removeProduct(index),
-            icon: const Icon(
-              Icons.remove_circle_outline,
-              color: Color(0xFFEF4444),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -594,31 +602,44 @@ class _Sales_AddOrderScreenState extends State<Sales_AddOrderScreen> {
   }
 
   // Update the _showAddNewProductDialog method
-  Future<String?> _showAddNewProductDialog(BuildContext context) async {
-    final nameController = TextEditingController();
+  Future<void> _showAddNewProductDialog() async {
     final quantityController = TextEditingController();
     final formKey = GlobalKey<FormState>();
+    String? selectedProductId;
 
-    return showDialog<String>(
+    return showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Add New Product'),
+        title: const Text('Add Product'),
         content: Form(
           key: formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextFormField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Product Name',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter product name';
-                  }
-                  return null;
+              Consumer<ProductsViewModel>(
+                builder: (context, productsVM, _) {
+                  return DropdownButtonFormField<String>(
+                    value: selectedProductId,
+                    decoration: const InputDecoration(
+                      labelText: 'Select Product',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: productsVM.products.map((product) {
+                      return DropdownMenuItem<String>(
+                        value: product.id,
+                        child: Text('${product.code} - ${product.name}'),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      selectedProductId = value;
+                    },
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please select a product';
+                      }
+                      return null;
+                    },
+                  );
                 },
               ),
               const SizedBox(height: 16),
@@ -648,154 +669,11 @@ class _Sales_AddOrderScreenState extends State<Sales_AddOrderScreen> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () async {
-              if (formKey.currentState!.validate()) {
-                final newProductName = nameController.text.trim();
-                final quantity = int.parse(quantityController.text.trim());
-                
-                try {
-                  await Provider.of<ProductViewModel>(context, listen: false)
-                      .addProduct(newProductName, quantity);
-                  setState(() {
-                  _orderProducts.add(ProductItem(
-                    name: newProductName,
-                    quantity: int.parse(quantityController.text.trim()),
-                    completed: 0,
-                  ));
-                });
-
-                  if (mounted) {
-                    // Return the new product name to be selected
-                    Navigator.pop(context, newProductName);
-                    
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Product added successfully'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Failed to add product: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
-            },
-            child: const Text('Add'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Update the _addProduct method to reset selectedProductName
-  void _addProduct() {
-    final quantityController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-    String? selectedProductName;
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add Product'),
-        content: SingleChildScrollView(
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Consumer<ProductViewModel>(
-                  builder: (context, productVM, _) {
-                    if (productVM.isLoading) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-
-                    if (productVM.error != null) {
-                      return Text('Error: ${productVM.error}');
-                    }
-
-                    final productNames = productVM.productNames;
-
-                    return DropdownButtonFormField<String>(
-                      value: selectedProductName,
-                      decoration: const InputDecoration(
-                        labelText: 'Select Product',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: [
-                        ...productNames.map((name) => DropdownMenuItem(
-                          value: name,
-                          child: Text(name),
-                        )).toList(),
-                        const DropdownMenuItem(
-                          value: "ADD_NEW",
-                          child: Row(
-                            children: [
-                              Icon(Icons.add_circle_outline, 
-                                   color: Color(0xFF1E40AF)),
-                              SizedBox(width: 8),
-                              Text('Add New Product'),
-                            ],
-                          ),
-                        ),
-                      ],
-                      onChanged: (value) {
-                        if (value == "ADD_NEW") {
-                          Navigator.pop(context);
-                          _showAddNewProductDialog(context);
-                        } else {
-                          selectedProductName = value;
-                        }
-                      },
-                      validator: (value) {
-                        if (value == null || value == "ADD_NEW") {
-                          return 'Please select a product';
-                        }
-                        return null;
-                      },
-                    );
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: quantityController,
-                  decoration: const InputDecoration(
-                    labelText: 'Quantity',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.number,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter quantity';
-                    }
-                    final quantity = int.tryParse(value);
-                    if (quantity == null || quantity <= 0) {
-                      return 'Please enter a valid quantity';
-                    }
-                    return null;
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
             onPressed: () {
-              if (formKey.currentState!.validate() && 
-                  selectedProductName != null && 
-                  selectedProductName != "ADD_NEW") {
+              if (formKey.currentState!.validate() && selectedProductId != null) {
                 setState(() {
                   _orderProducts.add(ProductItem(
-                    name: selectedProductName!,
+                    productId: selectedProductId!,
                     quantity: int.parse(quantityController.text.trim()),
                     completed: 0,
                   ));
@@ -808,6 +686,11 @@ class _Sales_AddOrderScreenState extends State<Sales_AddOrderScreen> {
         ],
       ),
     );
+  }
+
+  // Update the _addProduct method to reset selectedProductName
+  void _addProduct() {
+    _showAddNewProductDialog();
   }
 
   void _removeProduct(int index) {
@@ -885,7 +768,7 @@ class _Sales_AddOrderScreenState extends State<Sales_AddOrderScreen> {
       );
 
       final ordersViewModel = Provider.of<OrdersViewModel>(context, listen: false);
-      final productViewModel = Provider.of<ProductViewModel>(context, listen: false);
+      final productViewModel = Provider.of<ProductionViewModel>(context, listen: false);
 
       if (widget.orderToEdit != null) {
         await ordersViewModel.updateOrder(order);
@@ -927,34 +810,7 @@ class _Sales_AddOrderScreenState extends State<Sales_AddOrderScreen> {
         return 'High';
     }
   }
-
-  void _handleProductSelection(String? productName) {
-    if (productName == null) return;
-    
-    if (productName == "ADD_NEW") {
-      _showAddNewProductDialog(context);
-    } else {
-      // Check if product already exists in order
-      if (_orderProducts.any((p) => p.name == productName)) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('This product is already added to the order'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-        return;
-      }
-
-      setState(() {
-        _orderProducts.add(ProductItem(
-          name: productName,
-          quantity: 0,
-          completed: 0,
-        ));
-      });
-    }
-  }
-
+  
   @override
   void dispose() {
     _specialInstructionsController.dispose();

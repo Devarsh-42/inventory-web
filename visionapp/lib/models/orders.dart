@@ -107,7 +107,7 @@ class Order {
   Map<String, int> get groupedProducts {
     final Map<String, int> grouped = {};
     for (var product in products) {
-      grouped[product.name] = (grouped[product.name] ?? 0) + product.quantity;
+      grouped[product.productId] = (grouped[product.productId] ?? 0) + product.quantity;
     }
     return grouped;
   }
@@ -115,26 +115,26 @@ class Order {
   Map<String, int> get groupedCompletedProducts {
     final Map<String, int> grouped = {};
     for (var product in products) {
-      grouped[product.name] = (grouped[product.name] ?? 0) + product.completed;
+      grouped[product.productId] = (grouped[product.productId] ?? 0) + product.completed;
     }
     return grouped;
   }
 }
 
 class ProductItem {
-  final String name;
+  final String productId;  // Changed from name
   final int quantity;
   final int completed;
-
+  
   ProductItem({
-    required this.name,
+    required this.productId,
     required this.quantity,
     this.completed = 0,
   });
 
   factory ProductItem.fromJson(Map<String, dynamic> json) {
     return ProductItem(
-      name: json['name'],
+      productId: json['product_id'],  // Changed from name
       quantity: json['quantity'],
       completed: json['completed'] ?? 0,
     );
@@ -142,7 +142,7 @@ class ProductItem {
 
   Map<String, dynamic> toJson() {
     return {
-      'name': name,
+      'product_id': productId,  // Changed from name
       'quantity': quantity,
       'completed': completed,
     };

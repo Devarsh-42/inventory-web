@@ -10,9 +10,9 @@ import 'package:visionapp/view/production/production_bottom_nav.dart';
 import 'package:visionapp/view/production/production_details_screen.dart';
 import 'package:visionapp/view/production/production_management_screen.dart';
 import 'package:visionapp/view/production/production_queue_management_screen.dart';
-import 'package:visionapp/view/production/dispatch_screen.dart'; // Import DispatchScreen
-import 'package:visionapp/viewmodels/completed_production_viewmodel.dart';
+import 'package:visionapp/view/production/dispatch_screen.dart';
 import 'package:visionapp/widgets/inventory_status_widget.dart';
+import 'widgets/productwise_dashboard_content.dart';
 import '../../viewmodels/production_viewmodel.dart';
 import '../../viewmodels/dispatch_viewmodel.dart';
 import '../../repositories/dispatch_repository.dart';
@@ -286,44 +286,44 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
     );
   }
 
+  Widget _buildInventoryStatus() {
+    return Consumer<DispatchViewModel>(
+      builder: (context, dispatchViewModel, _) {
+        return InventoryStatusWidget(
+          inventory: dispatchViewModel.productInventory,
+          isExpanded: true,
+        );
+      },
+    );
+  }
+
   Widget _buildStatsGrid(ProductionViewModel viewModel) {
     bool isMobile = ResponsiveHelper.isMobile(context);
     
-    return Container(
-      height: 180, // Fixed height to prevent overflow
+    return SizedBox(
+      height: 180,
       child: isMobile 
         ? Column(
             children: [
-              Expanded(child: _buildInventoryStatus()),
+              _buildInventoryStatus(),
               const SizedBox(height: 16),
               _buildStatCards(viewModel),
             ],
           )
         : Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch, // Make children fill height
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(
-                flex: 9, // Increase flex for inventory status
+                flex: 3,
                 child: _buildInventoryStatus(),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 16),
               Expanded(
-                flex: 1, // Decrease flex for stat cards
+                flex: 2,
                 child: _buildStatCards(viewModel),
               ),
             ],
           ),
-    );
-  }
-
-  Widget _buildInventoryStatus() {
-    return Consumer<DispatchViewModel>(
-      builder: (context, dispatchViewModel, _) {
-        return InventoryStatusWidget(
-          productQuantities: dispatchViewModel.productInventory,
-          totalQuantity: dispatchViewModel.totalInventory,
-        );
-      },
     );
   }
 
@@ -415,13 +415,11 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
   }
 
   Widget _buildActiveProductions(ProductionViewModel viewModel) {
-    final filteredProductions = _getFilteredProductions(viewModel);
-    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Active Productions',
+          'Production Overview',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w700,
@@ -430,7 +428,22 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
           ),
         ),
         const SizedBox(height: 14),
-        ...filteredProductions.take(3).map((production) => _buildProductionCard(production)),
+        // Add ProductWiseDashboard here
+        ProductWiseDashboard(),
+        const SizedBox(height: 24),
+        const Text(
+          'Recent Production Items',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF1F2937),
+            letterSpacing: -0.3,
+          ),
+        ),
+        const SizedBox(height: 14),
+        ...viewModel.productions
+            .take(3)
+            .map((production) => _buildProductionCard(production)),
       ],
     );
   }
@@ -729,7 +742,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
       builder: (context) => AlertDialog(
         title: const Text('Delete Completed Productions'),
         content: const Text(
-          'Are you sure you want to delete all completed productions? This action cannot be undone.'
+          'Are you sure you want to delete all completed, ready & shipped products? This action cannot be undone.'
         ),
         actions: [
           TextButton(
@@ -750,7 +763,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Completed productions deleted successfully'),
+                      content: Text('Completed, Ready & Shipped Products deleted successfully'),
                       backgroundColor: Colors.green,
                     ),
                   );

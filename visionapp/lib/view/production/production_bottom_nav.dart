@@ -3,7 +3,7 @@ import 'package:visionapp/view/production/production_dashboard.dart';
 import 'package:visionapp/view/production/production_management_screen.dart';
 import 'package:visionapp/view/production/production_order_details_screen.dart';
 import 'package:visionapp/view/production/production_queue_management_screen.dart';
-import 'package:visionapp/view/production/dispatch_screen.dart';
+import 'package:visionapp/view/production/dispatch_screen.dart' as dispatch;
 
 class ProductionBottomNav extends StatelessWidget {
   final String currentRoute;
@@ -64,7 +64,7 @@ class ProductionBottomNav extends StatelessWidget {
             'Dispatch',
             Icons.local_shipping,
             '/dispatch',
-            const DispatchScreen(),
+            const dispatch.DispatchScreen(),
           ),
           // _buildNavItem(
           //   context,

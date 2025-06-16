@@ -1,5 +1,5 @@
 // lib/viewmodels/inventory_viewmodel.dart
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../models/inventory.dart';
 import '../repositories/inventory_repository.dart';
 
@@ -17,38 +17,27 @@ class InventoryViewModel extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  // Get inventory summary
-  Map<String, int> get inventorySummary {
-    int inStock = 0;
-    int lowStock = 0;
-    int outOfStock = 0;
-
+  // Get inventory metrics
+  Map<String, Map<String, int>> get inventoryMetrics {
+    final metrics = <String, Map<String, int>>{};
+    
     for (var item in _inventory) {
-      switch (item.calculatedStatus) {
-        case InventoryStatus.inStock:
-          inStock++;
-          break;
-        case InventoryStatus.lowStock:
-          lowStock++;
-          break;
-        case InventoryStatus.outOfStock:
-          outOfStock++;
-          break;
-      }
+      metrics[item.productName] = {
+        'total': item.totalQuantity,
+        'available': item.availableQty,
+        'allocated': item.allocatedQty,
+        'current': item.currentQty,
+      };
     }
-
-    return {
-      'inStock': inStock,
-      'lowStock': lowStock,
-      'outOfStock': outOfStock,
-    };
+    
+    return metrics;
   }
 
   // Get low stock items
   List<Inventory> get lowStockItems {
     return _inventory.where((item) => 
-      item.calculatedStatus == InventoryStatus.lowStock ||
-      item.calculatedStatus == InventoryStatus.outOfStock
+      item.status == InventoryStatus.lowStock ||
+      item.status == InventoryStatus.outOfStock
     ).toList();
   }
 
@@ -67,56 +56,38 @@ class InventoryViewModel extends ChangeNotifier {
     }
   }
 
-  // Update inventory item
-  Future<void> updateInventory(Inventory item) async {
+  // Adjust quantities
+  Future<void> adjustQuantities(
+    String inventoryId, {
+    required int availableDelta,
+    required int allocatedDelta,
+  }) async {
     _setLoading(true);
     _clearError();
 
     try {
-      final updatedItem = await _repository.updateInventory(item);
-      final index = _inventory.indexWhere((i) => i.id == item.id);
-      if (index != -1) {
-        _inventory[index] = updatedItem;
-        notifyListeners();
-      }
+      await _repository.adjustQuantities(
+        inventoryId,
+        availableDelta: availableDelta,
+        allocatedDelta: allocatedDelta,
+      );
+      await loadInventory(); // Reload to get updated quantities
     } catch (e) {
-      _setError('Failed to update inventory: ${e.toString()}');
+      _setError('Failed to adjust quantities: ${e.toString()}');
       rethrow;
     } finally {
       _setLoading(false);
     }
   }
 
-  // Adjust stock
-  Future<void> adjustStock(String inventoryId, int adjustment, String reason) async {
-    _setLoading(true);
-    _clearError();
-
+  // Check availability
+  Future<bool> checkAvailability(String inventoryId, int quantity) async {
     try {
-      await _repository.adjustStock(inventoryId, adjustment, reason);
-      // Reload inventory after adjustment
-      await loadInventory();
+      return await _repository.checkAvailability(inventoryId, quantity);
     } catch (e) {
-      _setError('Failed to adjust stock: ${e.toString()}');
-      rethrow;
-    } finally {
-      _setLoading(false);
+      _setError('Failed to check availability: ${e.toString()}');
+      return false;
     }
-  }
-
-  // Search inventory
-  List<Inventory> searchInventory(String query) {
-    if (query.isEmpty) return _inventory;
-    
-    return _inventory.where((item) {
-      return item.productName.toLowerCase().contains(query.toLowerCase()) ||
-             item.location.toLowerCase().contains(query.toLowerCase());
-    }).toList();
-  }
-
-  // Filter by status
-  List<Inventory> filterByStatus(InventoryStatus status) {
-    return _inventory.where((item) => item.calculatedStatus == status).toList();
   }
 
   // Helper methods
@@ -132,10 +103,5 @@ class InventoryViewModel extends ChangeNotifier {
 
   void _clearError() {
     _error = null;
-  }
-
-  void clearError() {
-    _clearError();
-    notifyListeners();
   }
 }

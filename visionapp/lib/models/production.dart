@@ -10,7 +10,8 @@ class Production {
   final DateTime createdAt;
   final String? orderId;
   final Map<String, dynamic>? orderDetails;
-  final int availableQuantity; // Add this field
+  final Map<String, dynamic>? orders; // Add this field
+  final int availableQuantity;
 
   double get progress => completedQuantity / targetQuantity;
   bool get isCompleted => status == 'completed';
@@ -24,6 +25,7 @@ class Production {
     DateTime? createdAt,
     this.orderId,
     this.orderDetails,
+    this.orders, // Add this parameter
     this.availableQuantity = 0, // Add default value
   }) : 
     this.id = id ?? const Uuid().v4(),
@@ -35,11 +37,12 @@ class Production {
       productName: json['product_name'] ?? '',
       targetQuantity: json['target_quantity'] ?? 0,
       completedQuantity: json['completed_quantity'] ?? 0,
-      status: json['status'] ?? 'pending',
+      status: json['status'] ?? 'in_production',
       createdAt: DateTime.parse(json['created_at']),
-      orderId: json['order_id'],
-      orderDetails: json['order_details'],
-      availableQuantity: json['available_quantity'] ?? 0, // Add this field
+      orderId: json['order_id'], // This should now be correctly populated
+      orderDetails: json['order_details'] as Map<String, dynamic>?, // This should contain display_id
+      orders: json['orders'] as Map<String, dynamic>?, // Map the orders field
+      availableQuantity: json['available_quantity'] ?? 0,
     );
   }
 
@@ -53,16 +56,21 @@ class Production {
       'created_at': createdAt.toIso8601String(),
       'order_id': orderId,
       'order_details': orderDetails,
-      'available_quantity': availableQuantity, // Add this field
+      'available_quantity': availableQuantity,
     };
   }
 
+  static const String STATUS_IN_PRODUCTION = 'in_production';
+  static const String STATUS_COMPLETED = 'completed';
+  static const String STATUS_READY = 'ready';
+  static const String STATUS_SHIPPED = 'shipped';
+
   static bool isValidStatus(String status) {
     return [
-      'queued',
-      'in progress',
-      'completed',
-      'paused'
+      STATUS_IN_PRODUCTION,  // when product added
+      STATUS_READY,         // when marked ready in dispatch
+      STATUS_COMPLETED,     // when marked completed in queue
+      STATUS_SHIPPED       // when marked shipped
     ].contains(status);
   }
 
@@ -75,6 +83,7 @@ class Production {
     DateTime? createdAt,
     String? orderId,
     Map<String, dynamic>? orderDetails,
+    Map<String, dynamic>? orders, // Add this parameter
     int? availableQuantity, // Add this parameter
   }) {
     return Production(
@@ -86,6 +95,7 @@ class Production {
       createdAt: createdAt ?? this.createdAt,
       orderId: orderId ?? this.orderId,
       orderDetails: orderDetails ?? this.orderDetails,
+      orders: orders ?? this.orders, // Add this field
       availableQuantity: availableQuantity ?? this.availableQuantity, // Add this field
     );
   }

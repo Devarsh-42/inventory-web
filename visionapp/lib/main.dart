@@ -6,27 +6,42 @@ import 'package:visionapp/view/production/production_dashboard.dart';
 import 'package:visionapp/view/admin/admin_dashboard.dart';
 import 'package:visionapp/view/sales/sales_dashboard.dart';
 import 'core/services/supabase_services.dart';
+import 'core/navigation/navigation_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SupabaseService.initialize();
-  runApp(const MyApp());
+  runApp(MyApp());
 }
 
-class MyApp extends StatefulWidget {
-  const MyApp({Key? key}) : super(key: key);
-
+class MyApp extends StatelessWidget {
   @override
-  State<MyApp> createState() => _MyAppState();
-}
-
-class _MyAppState extends State<MyApp> {
-  late final Future<Widget> _initialScreen;
-
-  @override
-  void initState() {
-    super.initState();
-    _initialScreen = _getInitialScreen();
+  Widget build(BuildContext context) {
+    return MultiProvider(
+      providers: AppProviders.providers,
+      child: MaterialApp(
+        navigatorKey: NavigationService.navigatorKey,
+        title: 'Production Management System',
+        theme: ThemeData(
+          primarySwatch: Colors.blue,
+          visualDensity: VisualDensity.adaptivePlatformDensity,
+        ),
+        home: FutureBuilder<Widget>(
+          future: _getInitialScreen(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Scaffold(
+                body: Center(
+                  child: CircularProgressIndicator(),
+                ),
+              );
+            }
+            return snapshot.data ?? const LoginScreen();
+          },
+        ),
+        debugShowCheckedModeBanner: false,
+      ),
+    );
   }
 
   Future<Widget> _getInitialScreen() async {
@@ -52,33 +67,5 @@ class _MyAppState extends State<MyApp> {
     }
 
     return const LoginScreen();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: AppProviders.providers,
-      child: MaterialApp(
-        title: 'Production Management System',
-        theme: ThemeData(
-          primarySwatch: Colors.blue,
-          visualDensity: VisualDensity.adaptivePlatformDensity,
-        ),
-        home: FutureBuilder<Widget>(
-          future: _initialScreen,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Scaffold(
-                body: Center(
-                  child: CircularProgressIndicator(),
-                ),
-              );
-            }
-            return snapshot.data ?? const LoginScreen();
-          },
-        ),
-        debugShowCheckedModeBanner: false,
-      ),
-    );
   }
 }

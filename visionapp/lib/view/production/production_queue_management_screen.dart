@@ -151,7 +151,7 @@ class _ProductionQueueScreenState extends State<ProductionQueueScreen> {
                     items: viewModel.inventoryItems.map((item) {
                       final currentQty = item.totalQuantity - item.availableQuantity;
                       return DropdownMenuItem(
-                        value: item.completionId,
+                        value: item.inventoryId,
                         child: Text(
                           '${item.productName} (Current: ${NumberFormatter.formatQuantity(currentQty)})',
                         ),
@@ -161,7 +161,7 @@ class _ProductionQueueScreenState extends State<ProductionQueueScreen> {
                       setState(() {
                         selectedInventoryId = value;
                         final selectedItem = viewModel.inventoryItems
-                            .firstWhere((item) => item.completionId == value);
+                            .firstWhere((item) => item.inventoryId == value);
                         totalQuantity = selectedItem.totalQuantity;
                         availableQuantity = selectedItem.availableQuantity;
                         currentQuantity = totalQuantity! - availableQuantity!;

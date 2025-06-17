@@ -38,7 +38,7 @@ class ProductionQueueViewModel extends ChangeNotifier {
       final inventoryList = await _inventoryRepository.getAllInventory();
       _inventoryItems = inventoryList.map((inventory) => InventoryStatusData(
         productName: inventory.productName,
-        completionId: inventory.id,
+        inventoryId: inventory.id,
         totalQuantity: inventory.totalQuantity,
         allocatedQuantity: inventory.allocatedQty,
         availableQuantity: inventory.availableQty,

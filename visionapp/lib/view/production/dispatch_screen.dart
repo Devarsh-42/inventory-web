@@ -89,7 +89,7 @@ class _DispatchScreenState extends State<DispatchScreen> {
         item.id,
         item.productName,
         newAllocatedQty,
-        inventory.completionId,
+        inventory.inventoryId,
       );
 
       ScaffoldMessenger.of(context).showSnackBar(

@@ -313,7 +313,7 @@ Future<void> deleteShippedDispatch(String dispatchId) async {
         final productName = item['product_name'] as String;
         inventory[productName] = InventoryStatusData(
           productName: productName,
-          completionId: item['id'],
+          inventoryId: item['id'],
           totalQuantity: item['total_quantity'] ?? 0,
           availableQuantity: item['available_qty'] ?? 0,
           allocatedQuantity: item['allocated_qty'] ?? 0,

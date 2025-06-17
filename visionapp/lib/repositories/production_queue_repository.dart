@@ -149,7 +149,7 @@ class ProductionQueueRepository {
       for (var item in response as List) {
         result[item['product_name']] = InventoryStatusData(
           productName: item['product_name'],
-          completionId: item['id'],
+          inventoryId: item['id'],
           totalQuantity: item['total_quantity'] ?? 0,
           availableQuantity: item['available_qty'] ?? 0,
           allocatedQuantity: item['allocated_qty'] ?? 0,

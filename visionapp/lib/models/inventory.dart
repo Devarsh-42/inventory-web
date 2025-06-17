@@ -87,33 +87,35 @@ class Inventory {
 
 class InventoryStatusData {
   final String productName;
-  final String completionId;  // Add this field
-  int totalQuantity;
-  int allocatedQuantity;
-  int availableQuantity;
+  final String inventoryId;  // Changed from completionId
+  final int totalQuantity;
+  final int availableQuantity;
+  final int allocatedQuantity;
+
+  int get currentQuantity => availableQuantity - allocatedQuantity;
 
   InventoryStatusData({
     required this.productName,
-    required this.completionId,  // Add this parameter
+    required this.inventoryId,  // Changed parameter name
     required this.totalQuantity,
-    required this.allocatedQuantity,
     required this.availableQuantity,
+    required this.allocatedQuantity,
   });
 
   factory InventoryStatusData.fromJson(Map<String, dynamic> json) {
     return InventoryStatusData(
       productName: json['product_name'],
-      completionId: json['completion_id'], // Initialize new field
+      inventoryId: json['id'],  // Changed from completion_id
       totalQuantity: json['total_quantity'] ?? 0,
-      allocatedQuantity: json['allocated_quantity'] ?? 0,
-      availableQuantity: json['available_quantity'] ?? 0,
+      availableQuantity: json['available_qty'] ?? 0,
+      allocatedQuantity: json['allocated_qty'] ?? 0,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'product_name': productName,
-      'completion_id': completionId, // Serialize new field
+      'completion_id': inventoryId, // Serialize new field
       'total_quantity': totalQuantity,
       'allocated_quantity': allocatedQuantity,
       'available_quantity': availableQuantity,

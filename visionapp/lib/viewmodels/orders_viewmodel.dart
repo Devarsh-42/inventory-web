@@ -259,7 +259,7 @@ class OrdersViewModel extends ChangeNotifier {
 
   List<Order> get completedOrders {
     return _orders
-        .where((order) => order.status == OrderStatus.completed)
+        .where((order) => order.status == OrderStatus.completed || order.status == OrderStatus.ready || order.status == OrderStatus.shipped)
         .toList();
   }
 

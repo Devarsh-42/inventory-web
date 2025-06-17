@@ -1,6 +1,5 @@
 // models/production_batch.dart
 import 'package:uuid/uuid.dart';
-import 'package:visionapp/models/production.dart';
 import 'package:visionapp/models/inventory.dart';
 
 class ProductionQueue {
@@ -81,50 +80,46 @@ class ProductionQueue {
     }
   }
 }
-
-// models/production_queue_item.dart
 class ProductionQueueItem {
   final String id;
   final String inventoryId;
-  final int queuePosition;
   final int quantity;
   final bool completed;
+  final int queuePosition;
   final DateTime createdAt;
   final DateTime updatedAt;
-  final Inventory? inventory;
+  final Inventory? inventory; // Add inventory field
 
   ProductionQueueItem({
     String? id,
     required this.inventoryId,
-    required this.queuePosition,
     required this.quantity,
     this.completed = false,
+    this.queuePosition = 0,
+    this.inventory, // Add to constructor
     DateTime? createdAt,
     DateTime? updatedAt,
-    this.inventory,
   }) : 
     this.id = id ?? const Uuid().v4(),
     this.createdAt = createdAt ?? DateTime.now(),
     this.updatedAt = updatedAt ?? DateTime.now();
 
   factory ProductionQueueItem.fromJson(Map<String, dynamic> json) {
-    if (json == null) throw ArgumentError('json cannot be null');
-    
     return ProductionQueueItem(
       id: json['id']?.toString() ?? const Uuid().v4(),
       inventoryId: json['inventory_id']?.toString() ?? '',
-      queuePosition: (json['queue_position'] ?? 0) as int,
       quantity: (json['quantity'] ?? 0) as int,
       completed: json['completed'] ?? false,
+      queuePosition: json['queue_position'] ?? 0,
+      inventory: json['inventory'] != null 
+          ? Inventory.fromJson(json['inventory'])
+          : null,
       createdAt: json['created_at'] != null 
           ? DateTime.parse(json['created_at'].toString()) 
           : DateTime.now(),
       updatedAt: json['updated_at'] != null 
           ? DateTime.parse(json['updated_at'].toString()) 
           : DateTime.now(),
-      inventory: json['inventory'] != null 
-          ? Inventory.fromJson(Map<String, dynamic>.from(json['inventory'])) 
-          : null,
     );
   }
 
@@ -132,11 +127,18 @@ class ProductionQueueItem {
     return {
       'id': id,
       'inventory_id': inventoryId,
-      'queue_position': queuePosition,
       'quantity': quantity,
       'completed': completed,
+      'queue_position': queuePosition,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
+      if (inventory != null) 'inventory': inventory!.toJson(),
     };
   }
+
+  // Helper methods
+  bool get canComplete => !completed;
+  
+  // Helper method to get inventory name
+  String get productName => inventory?.productName ?? 'Unknown Product';
 }

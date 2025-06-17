@@ -122,7 +122,7 @@ class Order {
 }
 
 class ProductItem {
-  final String productId;  // Changed from name
+  final String productId;
   final int quantity;
   final int completed;
   
@@ -134,7 +134,7 @@ class ProductItem {
 
   factory ProductItem.fromJson(Map<String, dynamic> json) {
     return ProductItem(
-      productId: json['product_id'],  // Changed from name
+      productId: json['product_id'],
       quantity: json['quantity'],
       completed: json['completed'] ?? 0,
     );
@@ -142,7 +142,7 @@ class ProductItem {
 
   Map<String, dynamic> toJson() {
     return {
-      'product_id': productId,  // Changed from name
+      'product_id': productId,
       'quantity': quantity,
       'completed': completed,
     };

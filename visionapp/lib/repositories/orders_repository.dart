@@ -25,41 +25,37 @@ class OrdersRepository {
   }
 
     Future<Order> createOrder(Order order) async {
-    try {
-      // Insert the order first
-      final orderResponse = await _supabaseService.client
-          .from(_tableName)
-          .insert({
-            'client_id': order.clientId,
-            'client_name': order.clientName,
-            'due_date': order.dueDate.toIso8601String(),
-            'status': order.status.toString().split('.').last.toLowerCase(),
-            'priority': order.priority.toString().split('.').last.toLowerCase(),
-            'special_instructions': order.specialInstructions,
-            'created_date': DateTime.now().toIso8601String(),
-          })
-          .select()
-          .single();
+  try {
+    // Insert the order first
+    final orderResponse = await _supabaseService.client
+        .from(_tableName)
+        .insert({
+          'client_id': order.clientId,
+          'client_name': order.clientName,
+          'due_date': order.dueDate.toIso8601String(),
+          'status': order.status.toString().split('.').last.toLowerCase(),
+          'priority': order.priority.toString().split('.').last.toLowerCase(),
+          'special_instructions': order.specialInstructions,
+          'created_date': DateTime.now().toIso8601String(),
+        })
+        .select()
+        .single();
 
-      // Insert order products
-      final productsData = order.products.map((product) => {
-        'order_id': orderResponse['id'],
-        'product_id': product.productId,
-        'quantity': product.quantity,
-        'completed': product.completed,
-      }).toList();
+    // Insert order products
+    final productsData = order.products.map((product) => {
+      'order_id': orderResponse['id'],
+      'product_id': product.productId,
+      'quantity': product.quantity,
+      'completed': product.completed,
+    }).toList();
 
-      await _supabaseService.client.from(_productsTable).insert(productsData);
+    await _supabaseService.client.from(_productsTable).insert(productsData);
 
-      // Return the created order with its products
-      return Order.fromJson({
-        ...orderResponse,
-        'products': productsData,
-      });
-    } catch (e) {
-      throw Exception('Failed to create order: $e');
-    }
+    return getOrderById(orderResponse['id']);
+  } catch (e) {
+    throw Exception('Failed to create order: $e');
   }
+}
 
 
 Future<void> deleteOrder(String orderId) async {

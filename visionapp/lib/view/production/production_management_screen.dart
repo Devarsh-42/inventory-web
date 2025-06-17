@@ -4,6 +4,7 @@ import 'package:visionapp/core/utils/number_formatter.dart';
 import 'package:visionapp/models/grouped_production_view.dart';
 import 'package:visionapp/models/orders.dart';
 import 'package:visionapp/viewmodels/dispatch_viewmodel.dart';
+import 'package:visionapp/viewmodels/inventory_viewmodel.dart';
 import 'package:visionapp/widgets/inventory_status_widget.dart';
 import '../../viewmodels/production_viewmodel.dart';
 import '../../models/production.dart';
@@ -63,11 +64,30 @@ class _ProductsScreenState extends State<ProductsScreen>
                       ),
                     ),
                     const SizedBox(height: 16),
-                    Consumer<DispatchViewModel>(
-                      builder: (context, dispatchViewModel, _) {
-                        return InventoryStatusWidget(
-                          inventory: dispatchViewModel.productInventory,
-                          isExpanded: true,
+                    Consumer<InventoryViewModel>(
+                      builder: (context, inventoryViewModel, _) {
+                        if (inventoryViewModel.isLoading) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
+                        
+                        if (inventoryViewModel.error != null) {
+                          return Center(child: Text(inventoryViewModel.error!));
+                        }
+
+                        if (inventoryViewModel.inventory.isEmpty) {
+                          return const Center(child: Text('No inventory items available'));
+                        }
+
+                        return ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: inventoryViewModel.inventory.length,
+                          itemBuilder: (context, index) {
+                            final inventory = inventoryViewModel.inventory[index];
+                            return InventoryStatusWidget(
+                              inventory: inventory
+                            );
+                          },
                         );
                       },
                     ),

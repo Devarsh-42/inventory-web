@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:visionapp/viewmodels/Production_queue_viewModel%20.dart';
+import 'package:visionapp/viewmodels/inventory_viewmodel.dart';
 
 // Repository imports
 import 'repositories/production_repository.dart';
@@ -61,6 +62,13 @@ class AppProviders {
     ChangeNotifierProvider<DispatchViewModel>(
       create: (_) => DispatchViewModel(
         repository: DispatchRepository(),
+      ),
+    ),
+    
+    // Add InventoryViewModel provider
+    ChangeNotifierProvider<InventoryViewModel>(
+      create: (_) => InventoryViewModel(
+        InventoryRepository(),
       ),
     ),
   ];

@@ -1,340 +1,146 @@
 import 'package:flutter/foundation.dart';
 import '../models/dispatch.dart';
-import '../repositories/dispatch_repository.dart';
 import '../models/inventory.dart';
+import '../repositories/dispatch_repository.dart';
+import '../core/services/supabase_services.dart';
 
 class DispatchViewModel extends ChangeNotifier {
   final DispatchRepository _repository;
+  final _supabaseService = SupabaseService.instance;
+
   bool _isLoading = false;
   String? _error;
   List<DispatchItem> _items = [];
-  Map<String, List<DispatchItem>> _groupedItems = {};
+  Map<String, InventoryStatusData> _inventoryStatus = {};
 
-  DispatchViewModel({required DispatchRepository repository}) 
-      : _repository = repository;
+  DispatchViewModel({
+    required DispatchRepository repository,
+  }) : _repository = repository;
 
+  // Getters
   bool get isLoading => _isLoading;
   String? get error => _error;
+  List<DispatchItem> get items => _items;
   
-  // Rename dispatchItems to groupedDispatchItems for clarity
-  List<ClientDispatch> get groupedDispatchItems {
-    return _groupedItems.entries.map((entry) {
-      return ClientDispatch.fromItems(entry.key, entry.value);
-    }).toList()
-      ..sort((a, b) {
-        // Sort by status: pending -> ready -> shipped
-        final statusOrder = {
-          'shipped': 2,
-          'ready': 1,
-          'pending': 0
-        };
-        final statusCompare = (statusOrder[b.status] ?? 0)
-            .compareTo(statusOrder[a.status] ?? 0);
-        if (statusCompare != 0) return statusCompare;
-        
-        // Then by client name
-        return a.clientName.compareTo(b.clientName);
-      });
+  // Get inventory status for a specific product
+  InventoryStatusData? getInventoryStatus(String productName) {
+    return _inventoryStatus[productName];
   }
-  Map<String, InventoryStatusData> _inventory = <String, InventoryStatusData>{};
 
-  Map<String, InventoryStatusData> get productInventory => _inventory;
+  // Get grouped dispatch items by client
+  List<ClientDispatch> get groupedDispatchItems {
+    final groupedItems = <String, List<DispatchItem>>{};
+    
+    for (var item in _items) {
+      groupedItems.putIfAbsent(item.dispatchId, () => []).add(item);
+    }
+    
+    return groupedItems.entries
+        .map((e) => ClientDispatch.fromItems(e.key, e.value))
+        .toList();
+  }
 
-  int get totalInventory => 
-    _inventory.values.fold(0, (sum, status) => sum + status.totalQuantity);
-
+  // Load dispatch items
   Future<void> loadDispatchItems() async {
     try {
-      _isLoading = true;
-      _error = null;
-      notifyListeners();
-
-      final response = await _repository.getDispatchItems();
-      
-      // Group items by dispatch ID
-      _groupedItems = {};
-      for (var item in response) {
-        if (!_groupedItems.containsKey(item.dispatchId)) {
-          _groupedItems[item.dispatchId] = [];
-        }
-        _groupedItems[item.dispatchId]!.add(item);
-      }
-
-      _isLoading = false;
+      _setLoading(true);
+      _items = await _repository.getDispatchItems();
       notifyListeners();
     } catch (e) {
-      _error = e.toString();
-      _isLoading = false;
-      notifyListeners();
+      _setError(e.toString());
+    } finally {
+      _setLoading(false);
     }
   }
+
+  // Load inventory data directly using Supabase
   Future<void> loadInventory() async {
     try {
-      _inventory = await _repository.getInventoryStatus();
+      _setLoading(true);
+      
+      final response = await _supabaseService.client
+          .from('inventory_view') // Using a view that aggregates inventory data
+          .select()
+          .order('product_name');
+
+      _inventoryStatus = {};
+      
+      for (var item in response as List) {
+        _inventoryStatus[item['product_name']] = InventoryStatusData.fromJson(item);
+      }
+
       notifyListeners();
     } catch (e) {
-      _error = e.toString();
-      notifyListeners();
+      _setError('Failed to load inventory: $e');
+    } finally {
+      _setLoading(false);
     }
   }
 
-  Future<void> markItemAsReady(String itemId, String batchDetails) async {
+  // Mark item as ready
+  Future<void> markItemReady(String itemId) async {
     try {
-      _isLoading = true;
-      _error = null;
-      notifyListeners();
-
-      await _repository.markItemReady(itemId, batchDetails);
-      await loadDispatchItems();
-
-      _isLoading = false;
-      notifyListeners();
+      _setLoading(true);
+      await _repository.markReady(itemId);
+      await loadDispatchItems(); // Reload items after marking as ready
     } catch (e) {
-      _error = e.toString();
-      _isLoading = false;
-      notifyListeners();
+      _setError(e.toString());
+    } finally {
+      _setLoading(false);
     }
   }
 
+  // Ship dispatch
   Future<void> shipDispatch(
     String dispatchId, {
     required String shipmentDetails,
   }) async {
     try {
-      if (dispatchId.isEmpty) {
-        throw Exception('Invalid dispatch ID');
-      }
-
-      _isLoading = true;
-      _error = null;
-      notifyListeners();
-
+      _setLoading(true);
       await _repository.shipDispatch(
         dispatchId,
         shipmentDetails: shipmentDetails,
       );
-      
-      await loadDispatchItems();
-      await loadInventory();
-
-      _isLoading = false;
-      notifyListeners();
+      await loadDispatchItems(); // Reload items after shipping
     } catch (e) {
-      _error = e.toString();
-      _isLoading = false;
-      notifyListeners();
-      throw e;
+      _setError(e.toString());
+    } finally {
+      _setLoading(false);
     }
   }
 
-  Future<void> deleteDispatch(String dispatchId) async {
-    try {
-      _isLoading = true;
-      _error = null;
-      notifyListeners();
-
-      await _repository.deleteDispatch(dispatchId);
-      await loadDispatchItems();
-
-      _isLoading = false;
-      notifyListeners();
-    } catch (e) {
-      _error = e.toString();
-      _isLoading = false;
-      notifyListeners();
-      throw e;
-    }
-  }
-
-  Future<void> deleteShippedItems(String dispatchId) async {
-    try {
-      _isLoading = true;
-      _error = null;
-      notifyListeners();
-
-      await _repository.deleteShippedItems(dispatchId);
-      await loadDispatchItems();
-
-      _isLoading = false;
-      notifyListeners();
-    } catch (e) {
-      _error = e.toString();
-      _isLoading = false;
-      notifyListeners();
-      throw e;
-    }
-  }
-
-  Future<void> deleteShippedDispatch(String dispatchId) async {
-    try {
-      _isLoading = true;
-      _error = null;
-      notifyListeners();
-
-      await _repository.deleteShippedDispatch(dispatchId);
-      await loadDispatchItems();
-      await loadInventory(); // Reload inventory after deletion
-
-      _isLoading = false;
-      notifyListeners();
-    } catch (e) {
-      _error = e.toString();
-      _isLoading = false;
-      notifyListeners();
-      throw e; // Re-throw for UI handling
-    }
-  }
-  // Add these methods to your existing DispatchViewModel class
-
-Future<void> allocateToDispatchItem(
-  String itemId,
-  String productName,
-  int newAllocatedQuantity,
-  String completionId
-) async {
-  try {
-    _isLoading = true;
-    _error = null;
+  // Helper methods
+  void _setLoading(bool loading) {
+    _isLoading = loading;
     notifyListeners();
+  }
 
-    // First check inventory availability
-    final inventoryCheck = await _repository.checkInventoryAvailability(
-      productName,
-      newAllocatedQuantity
-    );
-
-    if (inventoryCheck['available'] == null || !inventoryCheck['available']!) {
-      throw Exception(inventoryCheck['message'] ?? 'Insufficient inventory');
-    }
-
-    // Perform allocation - update the dispatch item's allocated_quantity
-    await _repository.updateDispatchItemAllocation(
-      itemId,
-      newAllocatedQuantity,
-      completionId
-    );
-
-    // Reload data to reflect changes
-    await loadInventory();
-    await loadDispatchItems();
-
-    _isLoading = false;
+  void _setError(String error) {
+    _error = error;
     notifyListeners();
-  } catch (e) {
-    _error = e.toString();
-    _isLoading = false;
-    notifyListeners();
-    throw e;
   }
 }
 
-// Helper method to check if an item is ready based on allocation
-bool isItemReady(DispatchItem item) {
-  return item.allocatedQuantity >= item.quantity;
-}
-  Future<void> allocateToOrder(
-    String dispatchId,
-    String productName,
-    int quantity,
-    String completionId
-  ) async {
-    try {
-      _isLoading = true;
-      notifyListeners();
+// Helper class for inventory status
+class InventoryStatusData {
+  final String inventoryId;
+  final String productName;
+  final int totalRequiredQty;
+  final int availableQty;
 
-      // First check inventory availability
-      final inventoryCheck = await _repository.checkInventoryAvailability(
-        productName,
-        quantity
-      );
+  InventoryStatusData({
+    required this.inventoryId,
+    required this.productName,
+    required this.totalRequiredQty,
+    required this.availableQty,
+  });
 
-      if (inventoryCheck['available'] == null || !inventoryCheck['available']!) {
-        throw Exception(inventoryCheck['message'] ?? 'Insufficient inventory');
-      }
-
-      // Perform allocation
-      await _repository.allocateToDispatch(
-        dispatchId,
-        productName,
-        quantity,
-      );
-
-      await loadInventory();
-      await loadDispatchItems();
-
-      _isLoading = false;
-      notifyListeners();
-    } catch (e) {
-      _error = e.toString();
-      _isLoading = false;
-      notifyListeners();
-      throw e;
-    }
-  }
-
-  List<DispatchItem> getItemsByOrder(String orderId) {
-    return _items.where((item) => item.dispatchId == orderId).toList();
-  }
-
-  bool canCompleteOrder(String orderId) {
-    final orderItems = getItemsByOrder(orderId);
-    return orderItems.isNotEmpty && orderItems.every((item) => item.isReady);
-  }
-
-  // Add method to check if order can be shipped
-  bool canShipOrder(String dispatchId) {
-    final orderItems = _items.where((item) => item.dispatchId == dispatchId);
-    return orderItems.isNotEmpty && 
-           orderItems.every((item) => item.ready && !item.shipped);
-  }
-
-  // Get available inventory for allocation
-  InventoryStatusData? getAvailableInventory(String productName) {
-    return _inventory[productName];
-  }
-
-  // Get total inventory for a product
-  int getTotalInventory(String productName) {
-    return _inventory[productName]?.totalQuantity ?? 0;
-  }
-
-  // Add new helper methods
-  bool canMarkDispatchReady(String dispatchId) {
-    final items = _groupedItems[dispatchId] ?? [];
-    return items.isNotEmpty && 
-           items.every((item) => item.isFullyAllocated) &&
-           !items.every((item) => item.ready);
-  }
-
-  bool canShipDispatch(String dispatchId) {
-    final items = _groupedItems[dispatchId] ?? [];
-    return items.isNotEmpty && 
-           items.every((item) => item.ready) &&
-           !items.any((item) => item.shipped);
-  }
-
-  // Add method to mark all items in a dispatch as ready
-  Future<void> markDispatchReady(String dispatchId) async {
-    try {
-      _isLoading = true;
-      _error = null;
-      notifyListeners();
-
-      final items = _groupedItems[dispatchId] ?? [];
-      for (var item in items) {
-        if (!item.ready && item.isFullyAllocated) {
-          await _repository.markItemReady(item.id, '');
-        }
-      }
-
-      await loadDispatchItems();
-      _isLoading = false;
-      notifyListeners();
-    } catch (e) {
-      _error = e.toString();
-      _isLoading = false;
-      notifyListeners();
-      throw e;
-    }
+  factory InventoryStatusData.fromJson(Map<String, dynamic> json) {
+    return InventoryStatusData(
+      inventoryId: json['id'] ?? '',
+      productName: json['product_name'] ?? '',
+      totalRequiredQty: json['total_required_qty'] ?? 0,
+      availableQty: json['available_qty'] ?? 0,
+    );
   }
 }

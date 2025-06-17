@@ -100,24 +100,6 @@ class ProductionRepository {
       throw Exception('Failed to fetch productions by status: $e');
     }
   }
-
-  // Update method to use database function
-  Future<void> updateProduction(String id, Map<String, dynamic> updates) async {
-    try {
-      await _supabaseService.client
-          .from(_tableName)
-          .update(updates)
-          .eq('id', id);
-          
-      // Database triggers will handle:
-      // - Inventory updates
-      // - Dispatch item creation
-      // - Order status updates
-    } catch (e) {
-      throw Exception('Failed to update production: $e');
-    }
-  }
-
   Future<List<Production>> getInProductionItems() async {
     try {
       final response = await _supabaseService.client
@@ -133,24 +115,51 @@ class ProductionRepository {
     }
   }
 
-  Future<String> createProduction(String productName, int targetQuantity) async {
-    try {
-      final response = await _supabaseService.client
-          .from('productions')
-          .insert({
-            'product_name': productName,
-            'target_quantity': targetQuantity,
-            'completed_quantity': 0,
-            'status': 'in_production'
-          })
-          .select()
-          .single();
-
-      return response['id'] as String;
-    } catch (e) {
-      throw Exception('Failed to create production: $e');
-    }
+  /// Creating a new production now automatically fires our `create_inventory_after_prod` trigger
+  Future<String> createProduction({
+  required String productName,
+  required int targetQuantity,
+  String? orderId,
+}) async {
+  try {
+    final response = await _supabaseService.client
+        .from('productions')
+        .insert({
+          'product_name': productName,
+          'target_quantity': targetQuantity,
+          'status': 'in_production',
+          'order_id': orderId,
+          'completed_quantity': 0,
+        })
+        .select()
+        .single();
+    return response['id'] as String;
+  } catch (e) {
+    throw Exception('Failed to create production: $e');
   }
+}
+
+Future<void> updateProduction(String id, {
+  int? targetQuantity,
+  int? completedQuantity,
+  String? status,
+}) async {
+  try {
+    final updates = <String, dynamic>{};
+    if (targetQuantity != null) updates['target_quantity'] = targetQuantity;
+    if (completedQuantity != null) updates['completed_quantity'] = completedQuantity;
+    if (status != null && Production.isValidStatus(status)) {
+      updates['status'] = status;
+    }
+    
+    await _supabaseService.client
+        .from('productions')
+        .update(updates)
+        .eq('id', id);
+  } catch (e) {
+    throw Exception('Failed to update production: $e');
+  }
+}
 
   Future<Map<String, dynamic>> getProductionStats() async {
     try {
@@ -300,7 +309,8 @@ class ProductionRepository {
     } catch (e) {
       throw Exception('Failed to delete finished orders: $e');
     }
-  }Future<void> updateProductionWithQueue(String productionId, String queueId, int completedQuantity) async {
+  }
+  Future<void> updateProductionWithQueue(String productionId, String queueId, int completedQuantity) async {
     try {
       // Use a stored procedure to handle the transaction
       await _supabaseService.client

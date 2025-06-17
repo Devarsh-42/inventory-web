@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:convert';
 import 'package:visionapp/view/production/production_bottom_nav.dart';
+import 'package:visionapp/viewmodels/inventory_viewmodel.dart';
 import 'package:visionapp/widgets/inventory_status_widget.dart';
 import '../../viewmodels/dispatch_viewmodel.dart';
 import '../../models/dispatch.dart';
@@ -18,7 +19,6 @@ class DispatchScreen extends StatefulWidget {
 class _DispatchScreenState extends State<DispatchScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  final Map<String, TextEditingController> _allocationControllers = {};
 
   @override
   void initState() {
@@ -33,311 +33,10 @@ class _DispatchScreenState extends State<DispatchScreen> {
   @override
   void dispose() {
     _searchController.dispose();
-    _allocationControllers.values.forEach((controller) => controller.dispose());
     super.dispose();
   }
 
-  TextEditingController _getOrCreateController(
-    String itemId,
-    int initialValue,
-  ) {
-    if (!_allocationControllers.containsKey(itemId)) {
-      _allocationControllers[itemId] = TextEditingController(
-        text: initialValue.toString(),
-      );
-    }
-    return _allocationControllers[itemId]!;
-  }
-
-  Future<void> _allocateToItem(DispatchItem item) async {
-    final controller = _getOrCreateController(item.id, item.allocatedQuantity);
-    final newAllocatedQty = int.tryParse(controller.text) ?? 0;
-
-    if (newAllocatedQty < 0) {
-      _showErrorSnackBar('Allocated quantity cannot be negative');
-      return;
-    }
-
-    final viewModel = context.read<DispatchViewModel>();
-    final inventory = viewModel.getAvailableInventory(item.productName);
-
-    if (inventory == null) {
-      _showErrorSnackBar('No inventory data found for ${item.productName}');
-      return;
-    }
-
-    final currentAvailable =
-        inventory.availableQuantity - inventory.allocatedQuantity;
-    final additionalAllocation = newAllocatedQty - item.allocatedQuantity;
-
-    if (additionalAllocation > currentAvailable) {
-      _showErrorSnackBar(
-        'Insufficient inventory. Available: $currentAvailable',
-      );
-      return;
-    }
-
-    if (newAllocatedQty > item.quantity) {
-      _showErrorSnackBar(
-        'Cannot allocate more than requested quantity (${item.quantity})',
-      );
-      return;
-    }
-
-    try {
-      await viewModel.allocateToDispatchItem(
-        item.id,
-        item.productName,
-        newAllocatedQty,
-        inventory.inventoryId,
-      );
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Successfully allocated $newAllocatedQty units'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (e) {
-      _showErrorSnackBar('Error allocating: $e');
-    }
-  }
-
-  void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
-    );
-  }
-
-  Widget _buildDispatchItem(DispatchItem item) {
-    final isMobile = ResponsiveHelper.isMobile(context);
-    final viewModel = context.watch<DispatchViewModel>();
-    final inventory = viewModel.getAvailableInventory(item.productName);
-
-    final availableQty = inventory?.availableQuantity ?? 0;
-    final totalAllocatedQty = inventory?.allocatedQuantity ?? 0;
-    final currentAvailableQty = availableQty - totalAllocatedQty;
-
-    final controller = _getOrCreateController(item.id, item.allocatedQuantity);
-    final canAllocate = currentAvailableQty > 0;
-    final isFullyAllocated = inventory!.allocatedQuantity >= item.quantity;
-
-    return Card(
-      margin: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 8, vertical: 2),
-      elevation: item.isReady ? 2 : 1,
-      color: item.isReady ? Colors.green[50] : null,
-      child: Padding(
-        padding: EdgeInsets.all(isMobile ? 12 : 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Product name and status row
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    item.productName,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: isMobile ? 14 : 16,
-                    ),
-                  ),
-                ),
-                Icon(
-                  item.isReady
-                      ? Icons.check_circle
-                      : Icons.radio_button_unchecked,
-                  color: item.isReady ? Colors.green : Colors.grey,
-                  size: isMobile ? 20 : 24,
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 8),
-
-            // Quantity information
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Requested: ${NumberFormatter.formatQuantity(item.quantity)}',
-                        style: TextStyle(
-                          fontSize: isMobile ? 12 : 14,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                      Text(
-                        'Available: ${NumberFormatter.formatQuantity(currentAvailableQty)}',
-                        style: TextStyle(
-                          fontSize: isMobile ? 11 : 12,
-                          color:
-                              currentAvailableQty > 0
-                                  ? Colors.green[600]
-                                  : Colors.red[600],
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 12),
-
-            // Allocation input row
-            Row(
-              children: [
-                Expanded(
-                  flex: 2,
-                  child: TextFormField(
-                    controller: controller,
-                    keyboardType: TextInputType.number,
-                    enabled: canAllocate && !item.shipped,
-                    decoration: InputDecoration(
-                      labelText: 'Allocated Qty',
-                      hintText: '0',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: isMobile ? 8 : 12,
-                      ),
-                      labelStyle: TextStyle(fontSize: isMobile ? 12 : 14),
-                    ),
-                    style: TextStyle(fontSize: isMobile ? 13 : 14),
-                  ),
-                ),
-
-                const SizedBox(width: 12),
-
-                Expanded(
-                  flex: 1,
-                  child: ElevatedButton(
-                    onPressed:
-                        (canAllocate && !item.shipped)
-                            ? () => _allocateToItem(item)
-                            : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue[600],
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(
-                        vertical: isMobile ? 8 : 12,
-                      ),
-                    ),
-                    child: Text(
-                      'Allocate',
-                      style: TextStyle(fontSize: isMobile ? 11 : 12),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            // Progress indicator
-            if (item.quantity > 0) ...[
-              const SizedBox(height: 8),
-              LinearProgressIndicator(
-                value: item.allocatedQuantity / item.quantity,
-                backgroundColor: Colors.grey[200],
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  isFullyAllocated ? Colors.green : Colors.blue,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '${inventory!.allocatedQuantity}/${item.quantity} allocated ${isFullyAllocated ? '✓' : ''}',
-                style: TextStyle(
-                  fontSize: isMobile ? 10 : 11,
-                  color:
-                      isFullyAllocated ? Colors.green[600] : Colors.grey[600],
-                  fontWeight:
-                      isFullyAllocated ? FontWeight.w500 : FontWeight.normal,
-                ),
-              ),
-            ],
-
-            // Action buttons for ready/shipped items
-            if (item.isReady && !item.shipped) ...[
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  if (!item.ready)
-                    ElevatedButton.icon(
-                      onPressed: () => _showBatchDetailsDialog(item),
-                      icon: const Icon(Icons.inventory_2, size: 16),
-                      label: const Text('Mark Ready'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange[600],
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                  if (item.ready)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.green[100],
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Text(
-                        'READY FOR DISPATCH',
-                        style: TextStyle(
-                          color: Colors.green[700],
-                          fontWeight: FontWeight.w600,
-                          fontSize: isMobile ? 10 : 11,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ],
-
-            if (item.shipped) ...[
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.blue[100],
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.local_shipping,
-                      size: 16,
-                      color: Colors.blue[700],
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      'SHIPPED',
-                      style: TextStyle(
-                        color: Colors.blue[700],
-                        fontWeight: FontWeight.w600,
-                        fontSize: isMobile ? 10 : 11,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _showBatchDetailsDialog(DispatchItem item) async {
+  Future<void> _markItemReady(DispatchItem item) async {
     final batchDetailsController = TextEditingController();
 
     final result = await showDialog<String>(
@@ -423,8 +122,218 @@ class _DispatchScreenState extends State<DispatchScreen> {
     );
 
     if (result != null) {
-      await context.read<DispatchViewModel>().markItemAsReady(item.id, result);
+      try {
+        await context.read<DispatchViewModel>().markItemReady(item.id);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${item.productName} marked as ready'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error marking item as ready: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
+  }
+
+  Widget _buildDispatchItem(DispatchItem item) {
+    final isMobile = ResponsiveHelper.isMobile(context);
+    final viewModel = context.watch<DispatchViewModel>();
+    final inventoryStatus = viewModel.getInventoryStatus(item.productName);
+
+    if (inventoryStatus == null) {
+      return Card(
+        margin: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 8, vertical: 2),
+        child: Padding(
+          padding: EdgeInsets.all(isMobile ? 12 : 16),
+          child: Text(
+            'No inventory data for ${item.productName}',
+            style: TextStyle(color: Colors.red),
+          ),
+        ),
+      );
+    }
+
+    final availableQty = inventoryStatus.availableQty;
+    final canMarkReady =
+        availableQty >= item.quantity && !item.ready && !item.shipped;
+
+    return Card(
+      margin: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 8, vertical: 2),
+      elevation: item.ready ? 2 : 1,
+      color: item.ready ? Colors.green[50] : null,
+      child: Padding(
+        padding: EdgeInsets.all(isMobile ? 12 : 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Product name and status row
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    item.productName,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: isMobile ? 14 : 16,
+                    ),
+                  ),
+                ),
+                Icon(
+                  item.ready
+                      ? Icons.check_circle
+                      : Icons.radio_button_unchecked,
+                  color: item.ready ? Colors.green : Colors.grey,
+                  size: isMobile ? 20 : 24,
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 8),
+
+            // Quantity information
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Required: ${NumberFormatter.formatQuantity(item.quantity)}',
+                        style: TextStyle(
+                          fontSize: isMobile ? 12 : 14,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                      Text(
+                        'Available: ${NumberFormatter.formatQuantity(availableQty)}',
+                        style: TextStyle(
+                          fontSize: isMobile ? 11 : 12,
+                          color:
+                              availableQty >= item.quantity
+                                  ? Colors.green[600]
+                                  : Colors.red[600],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 12),
+
+            // Action buttons
+            Row(
+              children: [
+                if (canMarkReady) ...[
+                  ElevatedButton.icon(
+                    onPressed: () => _markItemReady(item),
+                    icon: const Icon(Icons.check, size: 16),
+                    label: const Text('Mark Ready'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange[600],
+                      foregroundColor: Colors.white,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isMobile ? 8 : 12,
+                        vertical: isMobile ? 6 : 8,
+                      ),
+                    ),
+                  ),
+                ] else if (item.ready && !item.shipped) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.green[100],
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      'READY FOR DISPATCH',
+                      style: TextStyle(
+                        color: Colors.green[700],
+                        fontWeight: FontWeight.w600,
+                        fontSize: isMobile ? 10 : 11,
+                      ),
+                    ),
+                  ),
+                ] else if (item.shipped) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.blue[100],
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.local_shipping,
+                          size: 16,
+                          color: Colors.blue[700],
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'SHIPPED',
+                          style: TextStyle(
+                            color: Colors.blue[700],
+                            fontWeight: FontWeight.w600,
+                            fontSize: isMobile ? 10 : 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+
+            // Show insufficient inventory warning if needed
+            if (!item.ready && availableQty < item.quantity) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.orange[50],
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: Colors.orange[200]!),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.warning_amber,
+                      size: 16,
+                      color: Colors.orange[600],
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        'Insufficient inventory (need ${item.quantity - availableQty} more)',
+                        style: TextStyle(
+                          fontSize: isMobile ? 10 : 11,
+                          color: Colors.orange[700],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _showShipmentDetailsDialog(ClientDispatch dispatch) async {
@@ -728,36 +637,49 @@ class _DispatchScreenState extends State<DispatchScreen> {
 
           return Column(
             children: [
-              // Inventory Status Widget - Adjust height and padding
+              // Inventory Status Widget
               Container(
-                height:
-                    ResponsiveHelper.isMobile(context)
-                        ? 80
-                        : 100, // Reduced height
+                height: ResponsiveHelper.isMobile(context) ? 80 : 100,
                 padding: EdgeInsets.symmetric(
                   horizontal: ResponsiveHelper.isMobile(context) ? 12 : 16,
-                  vertical:
-                      ResponsiveHelper.isMobile(context)
-                          ? 8
-                          : 12, // Reduced vertical padding
+                  vertical: ResponsiveHelper.isMobile(context) ? 8 : 12,
                 ),
-                child: InventoryStatusWidget(
-                  inventory: viewModel.productInventory,
-                  isExpanded: false,
+                child: Consumer<InventoryViewModel>(
+                  builder: (context, inventoryViewModel, _) {
+                    if (inventoryViewModel.isLoading) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    if (inventoryViewModel.error != null) {
+                      return Center(child: Text(inventoryViewModel.error!));
+                    }
+
+                    if (inventoryViewModel.inventory.isEmpty) {
+                      return const Center(
+                        child: Text('No inventory items available'),
+                      );
+                    }
+
+                    return ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: inventoryViewModel.inventory.length,
+                      itemBuilder: (context, index) {
+                        final inventory = inventoryViewModel.inventory[index];
+                        return InventoryStatusWidget(inventory: inventory);
+                      },
+                    );
+                  },
                 ),
               ),
 
-              // Add Divider for visual separation
               SizedBox(height: ResponsiveHelper.isMobile(context) ? 12 : 20),
 
-              // Search Bar - Adjust padding
+              // Search Bar
               Padding(
                 padding: EdgeInsets.symmetric(
                   horizontal: ResponsiveHelper.isMobile(context) ? 12 : 16,
-                  vertical:
-                      ResponsiveHelper.isMobile(context)
-                          ? 8
-                          : 12, // Reduced vertical padding
+                  vertical: ResponsiveHelper.isMobile(context) ? 8 : 12,
                 ),
                 child: TextField(
                   controller: _searchController,

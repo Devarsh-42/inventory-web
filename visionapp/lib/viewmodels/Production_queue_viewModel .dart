@@ -39,9 +39,8 @@ class ProductionQueueViewModel extends ChangeNotifier {
       _inventoryItems = inventoryList.map((inventory) => InventoryStatusData(
         productName: inventory.productName,
         inventoryId: inventory.id,
-        totalQuantity: inventory.totalQuantity,
-        allocatedQuantity: inventory.allocatedQty,
-        availableQuantity: inventory.availableQty,
+        totalRequiredQty: inventory.totalRequiredQty, // Add default value or use inventory.requiredQty
+        availableQty: inventory.availableQty,  // Use actual quantity from inventory
       )).toList();
       notifyListeners();
     } catch (e) {
@@ -96,18 +95,23 @@ class ProductionQueueViewModel extends ChangeNotifier {
   // Reorder queue
   Future<void> reorderQueue(int oldIndex, int newIndex) async {
     try {
-      if (oldIndex < newIndex) {
+      _setLoading(true);
+      
+      if (newIndex > oldIndex) {
         newIndex -= 1;
       }
-      final items = List<ProductionQueueItem>.from(_queueItems);
-      final item = items.removeAt(oldIndex);
-      items.insert(newIndex, item);
       
-      final orderedIds = items.map((item) => item.id).toList();
-      await _queueRepository.updateQueueOrder(orderedIds);
-      await loadQueue();
+      final List<String> newOrder = _queueItems.map((item) => item.id).toList();
+      final String item = newOrder.removeAt(oldIndex);
+      newOrder.insert(newIndex, item);
+      
+      await _queueRepository.updateQueueOrder(newOrder);
+      await loadQueue(); // Refresh the queue after reordering
     } catch (e) {
       _setError('Failed to reorder queue: $e');
+      print('Reorder error details: ${e.toString()}'); // Add logging
+    } finally {
+      _setLoading(false);
     }
   }
 

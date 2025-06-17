@@ -3,143 +3,138 @@ import 'package:provider/provider.dart';
 import 'package:visionapp/models/grouped_production_view.dart';
 import 'package:visionapp/models/inventory.dart';
 import 'package:visionapp/models/production.dart';
-import 'package:visionapp/repositories/inventory_repository.dart';
 import 'package:visionapp/repositories/orders_repository.dart';
 import 'package:visionapp/view/admin/admin_bottom_nav.dart';
 import 'package:visionapp/viewmodels/dispatch_viewmodel.dart';
+import 'package:visionapp/viewmodels/inventory_viewmodel.dart';
 import 'package:visionapp/viewmodels/production_viewmodel.dart';
 import 'package:visionapp/repositories/production_repository.dart';
 import 'package:visionapp/widgets/inventory_status_widget.dart';
-import 'package:visionapp/viewmodels/inventory_viewmodel.dart'; // Add this import
 import '../../pallet.dart';
 
-class ProductionManagementScreen extends StatefulWidget {
-  const ProductionManagementScreen({Key? key}) : super(key: key);
+class AdminProductionManagementScreen extends StatefulWidget {
+  const AdminProductionManagementScreen({Key? key}) : super(key: key);
 
   @override
-  State<ProductionManagementScreen> createState() => _ProductionManagementScreenState();
+  State<AdminProductionManagementScreen> createState() =>
+      _AdminProductionManagementScreenState();
 }
 
-class _ProductionManagementScreenState extends State<ProductionManagementScreen> {
-  late ProductionViewModel _viewModel;
-  late InventoryViewModel _inventoryViewModel; // Add this line
-  final int _selectedIndex = 3; // Production tab
+class _AdminProductionManagementScreenState
+    extends State<AdminProductionManagementScreen> {
+  final int _selectedIndex = 3;
 
   @override
   void initState() {
     super.initState();
-    _viewModel = ProductionViewModel(
-      repository: ProductionRepository(), 
-      ordersRepository: OrdersRepository(),
-    );
-    _inventoryViewModel = InventoryViewModel(InventoryRepository()); // Add this line
     _loadData();
   }
 
   Future<void> _loadData() async {
-    await _viewModel.loadProductions();
-    await _viewModel.getSystemAlerts();
-    await _inventoryViewModel.loadInventory(); // Add this line
+    // Get the view models from the provider
+    final productionVM = Provider.of<ProductionViewModel>(
+      context,
+      listen: false,
+    );
+    final inventoryVM = Provider.of<InventoryViewModel>(context, listen: false);
+
+    // Load both production and inventory data
+    await Future.wait([
+      productionVM.loadProductions(),
+      inventoryVM.loadInventory(),
+    ]);
   }
 
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        ChangeNotifierProvider.value(value: _viewModel),
-        ChangeNotifierProvider.value(value: _inventoryViewModel), // Add this line
-      ],
-      child: Scaffold(
-        backgroundColor: Palette.surfaceGray,
-        appBar: AppBar(
-          title: const Text(
-            'Production Management',
-            style: TextStyle(
-              color: Palette.inverseTextColor,
-              fontWeight: FontWeight.w700,
-              fontSize: 18,
-            ),
-          ),
-          backgroundColor: Palette.primaryBlue,
-          elevation: 0,
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.analytics_outlined, color: Palette.inverseTextColor),
-              onPressed: () {
-                // Navigate to analytics
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.refresh, color: Palette.inverseTextColor),
-              onPressed: _loadData,
-            ),
-          ],
-        ),
-        body: RefreshIndicator(
-          onRefresh: _loadData,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Updated Inventory Status Widget
-                Consumer<InventoryViewModel>(
-                  builder: (context, inventoryVM, _) {
-                    if (inventoryVM.isLoading) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    
-                    final inventoryData = Map<String, InventoryStatusData>.fromEntries(
-                      inventoryVM.inventory.map((item) => MapEntry(
-                        item.productName,
-                        InventoryStatusData(
-                          productName: item.productName,
-                          inventoryId: item.id,
-                          totalQuantity: item.totalQuantity,
-                          allocatedQuantity: item.allocatedQty,
-                          availableQuantity: item.availableQty,
-                        ),
-                      )),
-                    );
-
-                    return InventoryStatusWidget(
-                      inventory: inventoryData,
-                      isExpanded: true,
-                    );
-                  },
-                ),
-                const SizedBox(height: 24),
-
-                // Grouped Productions Tab
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: _buildGroupedProductionsTab(),
-                ),
-              ],
-            ),
+    return Scaffold(
+      backgroundColor: Palette.surfaceGray,
+      appBar: AppBar(
+        title: const Text(
+          'Production Management',
+          style: TextStyle(
+            color: Palette.inverseTextColor,
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
           ),
         ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () {
-            // Show dialog to create new production
-          },
-          child: const Icon(Icons.add),
-          backgroundColor: Palette.primaryBlue,
+        backgroundColor: Palette.primaryBlue,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Palette.inverseTextColor),
+            onPressed: _loadData,
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: _loadData,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Inventory Status Widget using InventoryViewModel
+
+              Consumer<InventoryViewModel>(
+                builder: (context, inventoryViewModel, _) {
+                  if (inventoryViewModel.isLoading) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  if (inventoryViewModel.error != null) {
+                    return Center(child: Text(inventoryViewModel.error!));
+                  }
+
+                  if (inventoryViewModel.inventory.isEmpty) {
+                    return const Center(
+                      child: Text('No inventory items available'),
+                    );
+                  }
+
+                  return ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: inventoryViewModel.inventory.length,
+                    itemBuilder: (context, index) {
+                      final inventory = inventoryViewModel.inventory[index];
+                      return InventoryStatusWidget(inventory: inventory);
+                    },
+                  );
+                },
+              ),
+              const SizedBox(height: 24),
+
+              // Grouped Productions Tab
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: _buildGroupedProductionsTab(),
+              ),
+            ],
+          ),
         ),
-        bottomNavigationBar: AdminBottomNav(
-          selectedIndex: _selectedIndex,
-          onItemTapped: (index) => AdminBottomNav.handleNavigation(context, index),
-        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          // Show dialog to create new production
+        },
+        child: const Icon(Icons.add),
+        backgroundColor: Palette.primaryBlue,
+      ),
+      bottomNavigationBar: AdminBottomNav(
+        selectedIndex: _selectedIndex,
+        onItemTapped:
+            (index) => AdminBottomNav.handleNavigation(context, index),
       ),
     );
   }
@@ -151,16 +146,28 @@ class _ProductionManagementScreenState extends State<ProductionManagementScreen>
           return const Center(child: CircularProgressIndicator());
         }
 
-        final groupedProductions = _groupProductions(viewModel.productions);
+        return FutureBuilder<List<GroupedProductionView>>(
+          future: _groupProductions(viewModel.productions),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-        return ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16),
-          itemCount: groupedProductions.length,
-          itemBuilder: (context, index) {
-            final group = groupedProductions[index];
-            return _buildGroupedProductionCard(group);
+            if (snapshot.hasError) {
+              return Center(child: Text('Error: ${snapshot.error}'));
+            }
+
+            final groupedProductions = snapshot.data!;
+            return ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              itemCount: groupedProductions.length,
+              itemBuilder: (context, index) {
+                final group = groupedProductions[index];
+                return _buildGroupedProductionCard(group);
+              },
+            );
           },
         );
       },
@@ -252,16 +259,11 @@ class _ProductionManagementScreenState extends State<ProductionManagementScreen>
           Expanded(
             child: Text(
               '${order.clientName} - ${order.quantity} units',
-              style: const TextStyle(
-                color: Color(0xFF4B5563),
-              ),
+              style: const TextStyle(color: Color(0xFF4B5563)),
             ),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 8,
-              vertical: 4,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
               color: _getPriorityColor(order.priority).withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
@@ -277,35 +279,6 @@ class _ProductionManagementScreenState extends State<ProductionManagementScreen>
           ),
         ],
       ),
-    );
-  }
-
-  List<Widget> _buildAlertCards(List<dynamic> alerts) {
-    return alerts.map((alert) => _buildAlertCard(
-      title: alert['title'],
-      description: alert['description'],
-      color: _getAlertColor(alert['type']),
-    )).toList();
-  }
-
-  Widget _buildLiveProductionList() {
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: _viewModel.productions.length,
-      itemBuilder: (context, index) {
-        final prod = _viewModel.productions[index];
-        return _buildProductionItem(
-          orderNumber: 'Order #${prod.orderId}',
-          product: prod.productName,
-          machine: 'Queue #${index + 1}',
-          startTime: _formatDateTime(prod.createdAt),
-          progress: prod.completedQuantity / prod.targetQuantity,
-          completed: prod.completedQuantity,
-          total: prod.targetQuantity,
-          status: _getProductionStatus(prod.status),
-        );
-      },
     );
   }
 
@@ -500,7 +473,9 @@ class _ProductionManagementScreenState extends State<ProductionManagementScreen>
           LinearProgressIndicator(
             value: progress,
             backgroundColor: Palette.dividerColor,
-            valueColor: const AlwaysStoppedAnimation<Color>(Palette.primaryBlue),
+            valueColor: const AlwaysStoppedAnimation<Color>(
+              Palette.primaryBlue,
+            ),
             minHeight: 8,
           ),
           const SizedBox(height: 8),
@@ -596,17 +571,26 @@ class _ProductionManagementScreenState extends State<ProductionManagementScreen>
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: isTargetMet
-                        ? [Palette.inProductionColor, const Color(0xFF10B981)]
-                        : [Palette.pausedColor, const Color(0xFFF59E0B)],
+                    colors:
+                        isTargetMet
+                            ? [
+                              Palette.inProductionColor,
+                              const Color(0xFF10B981),
+                            ]
+                            : [Palette.pausedColor, const Color(0xFFF59E0B)],
                   ),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Text(
-                  isTargetMet ? 'Target Met' : '${(achieved / target * 100).round()}% Complete',
+                  isTargetMet
+                      ? 'Target Met'
+                      : '${(achieved / target * 100).round()}% Complete',
                   style: const TextStyle(
                     color: Palette.inverseTextColor,
                     fontSize: 10,
@@ -683,8 +667,14 @@ class _ProductionManagementScreenState extends State<ProductionManagementScreen>
     }
   }
 
-  List<GroupedProductionView> _groupProductions(List<Production> productions) {
+  Future<List<GroupedProductionView>> _groupProductions(
+    List<Production> productions,
+  ) async {
     Map<String, GroupedProductionView> groups = {};
+    final ordersRepository = Provider.of<OrdersRepository>(
+      context,
+      listen: false,
+    );
 
     for (var prod in productions) {
       if (!groups.containsKey(prod.productName)) {
@@ -702,33 +692,36 @@ class _ProductionManagementScreenState extends State<ProductionManagementScreen>
       groups[prod.productName]!.totalCompletedQuantity +=
           prod.completedQuantity;
 
-      if (prod.orderId != null && prod.orderDetails != null) {
+      if (prod.orderId != null) {
         // Check if order is not already added
         final orderExists = groups[prod.productName]!.orders.any(
           (order) => order.orderId == prod.orderId,
         );
 
         if (!orderExists) {
-          groups[prod.productName]!.orders.add(
-            OrderSummary(
-              orderId: prod.orderId!,
-              displayId: prod.orderDetails!['displayId'] ?? '',
-              clientName: prod.orderDetails!['clientName'] ?? 'Unknown Client',
-              quantity: prod.targetQuantity,
-              priority: prod.orderDetails!['priority'] ?? 'normal',
-              dueDate: prod.orderDetails!['dueDate'] ?? DateTime.now(),
-            ),
-          );
+          try {
+            final orderDetails = await ordersRepository.getOrderById(
+              prod.orderId!,
+            );
+
+            groups[prod.productName]!.orders.add(
+              OrderSummary(
+                orderId: prod.orderId!,
+                displayId: orderDetails.displayId,
+                clientName: orderDetails.clientName,
+                quantity: prod.targetQuantity,
+                priority: orderDetails.priority.toString().split('.').last,
+                dueDate: orderDetails.dueDate,
+              ),
+            );
+          } catch (e) {
+            print('Error fetching order details for ID ${prod.orderId}: $e');
+          }
         }
       }
     }
-
     return groups.values.toList();
   }
 }
 
-enum ProductionStatus {
-  running,
-  paused,
-  completed,
-}
+enum ProductionStatus { running, paused, completed }

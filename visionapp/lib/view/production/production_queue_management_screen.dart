@@ -102,7 +102,7 @@ class _ProductionQueueScreenState extends State<ProductionQueueScreen> {
           children: [
             Text('Quantity: ${item.quantity}'),
             Text('Available: ${inventory.availableQty} / '
-                'Total: ${inventory.totalQuantity}'),
+                'Total: ${inventory.totalRequiredQty}'),
             LinearProgressIndicator(
               value: clampedProgress / 100,
               backgroundColor: Colors.grey[200],
@@ -149,7 +149,7 @@ class _ProductionQueueScreenState extends State<ProductionQueueScreen> {
                   DropdownButtonFormField<String>(
                     hint: const Text('Select Product'),
                     items: viewModel.inventoryItems.map((item) {
-                      final currentQty = item.totalQuantity - item.availableQuantity;
+                      final currentQty = item.totalRequiredQty - item.availableQty;
                       return DropdownMenuItem(
                         value: item.inventoryId,
                         child: Text(
@@ -162,8 +162,8 @@ class _ProductionQueueScreenState extends State<ProductionQueueScreen> {
                         selectedInventoryId = value;
                         final selectedItem = viewModel.inventoryItems
                             .firstWhere((item) => item.inventoryId == value);
-                        totalQuantity = selectedItem.totalQuantity;
-                        availableQuantity = selectedItem.availableQuantity;
+                        totalQuantity = selectedItem.totalRequiredQty;
+                        availableQuantity = selectedItem.availableQty;
                         currentQuantity = totalQuantity! - availableQuantity!;
                       });
                     },

@@ -70,8 +70,9 @@ class ProductionViewModel extends ChangeNotifier {
   Future<Production> createProduction(Production production) async {
     try {
       final String productionId = await _repository.createProduction(
-        production.productName,
-        production.targetQuantity
+        productName: production.productName,
+        targetQuantity: production.targetQuantity,
+        orderId: production.orderId
       );
       await loadProductions(); // Refresh the list
       return production.copyWith(id: productionId);
@@ -94,14 +95,42 @@ class ProductionViewModel extends ChangeNotifier {
       _isLoading = true;
       notifyListeners();
 
-      await _repository.updateProduction(id, updates);
-      
-      // The database trigger will handle:
-      // 1. Updating inventory when status changes to 'completed'
-      // 2. Creating dispatch items when needed
-      // 3. Updating related order status
+      await _repository.updateProduction(
+        id,
+        targetQuantity: updates['target_quantity'],
+        completedQuantity: updates['completed_quantity'],
+        status: updates['status'],
+      );
       
       await loadProductions();
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      throw e;
+    }
+  }
+
+  // Add new method to update production with queue
+  Future<void> updateProductionWithQueue(
+    String productionId, 
+    String queueId, 
+    int completedQuantity
+  ) async {
+    try {
+      _isLoading = true;
+      notifyListeners();
+
+      await _repository.updateProductionWithQueue(
+        productionId,
+        queueId,
+        completedQuantity
+      );
+
+      await loadProductions(); // Refresh the list
+
+      _isLoading = false;
+      notifyListeners();
     } catch (e) {
       _error = e.toString();
       _isLoading = false;
@@ -388,6 +417,7 @@ class ProductionViewModel extends ChangeNotifier {
         completedQuantity: 0,
         status: Production.STATUS_IN_PRODUCTION,
         createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
         // Don't set orderId for standalone products
       );
 
@@ -430,6 +460,42 @@ class ProductionViewModel extends ChangeNotifier {
       return product.id;
     } catch (e) {
       print('Error getting product ID: $e');
+      return null;
+    }
+  }
+
+  // Add method to get production alerts
+  Future<Map<String, List<Production>>> getProductionAlerts() async {
+    try {
+      final alerts = await _repository.getSystemAlerts();
+      
+      final pausedProductions = (alerts['production_alerts'] as List)
+          .where((p) => p['status'] == 'paused')
+          .map((p) => Production.fromJson(p))
+          .toList();
+
+      final incompleteProductions = (alerts['production_alerts'] as List)
+          .where((p) => p['completed_quantity'] < p['target_quantity'])
+          .map((p) => Production.fromJson(p))
+          .toList();
+
+      return {
+        'paused': pausedProductions,
+        'incomplete': incompleteProductions,
+      };
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      throw e;
+    }
+  }
+
+  // Add helper method for order details
+  Map<String, dynamic>? getOrderDetails(String productionId) {
+    try {
+      final production = _productions.firstWhere((p) => p.id == productionId);
+      return production.orderDetails;
+    } catch (e) {
       return null;
     }
   }

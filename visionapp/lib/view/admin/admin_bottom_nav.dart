@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:visionapp/view/admin/admin_dashboard.dart';
+import 'package:visionapp/view/admin/admin_production_management_screen.dart';
 import 'package:visionapp/view/admin/orders_management_screen.dart';
 import 'package:visionapp/view/admin/performance_management_admin_screen.dart';
 import 'package:visionapp/view/admin/production_management_screen.dart';
@@ -104,7 +105,7 @@ class AdminBottomNav extends StatelessWidget {
         if (context.mounted) {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => const ProductionManagementScreen()),
+            MaterialPageRoute(builder: (context) => const AdminProductionManagementScreen()),
           );
         }
         break;

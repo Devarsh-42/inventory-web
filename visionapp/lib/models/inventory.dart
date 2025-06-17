@@ -7,21 +7,17 @@ enum InventoryStatus {
 
 class Inventory {
   final String id;
-  final String productionId;  // Changed from productId
+  final String productionId;
   final String productName;
-  final int totalQuantity;
-  final int availableQty;     // Changed from availableQuantity
-  final int allocatedQty;     // Changed from allocatedQuantity
-  final DateTime createdAt;    // Added
-  final DateTime updatedAt;    // Changed from lastUpdated
-
-  // Computed property for current quantity
-  int get currentQty => availableQty - allocatedQty;
+  final int totalRequiredQty;
+  final int availableQty;
+  final DateTime createdAt;
+  final DateTime updatedAt;
 
   // Updated status calculation based on available quantity
   InventoryStatus get status {
     if (availableQty <= 0) return InventoryStatus.outOfStock;
-    if (availableQty < (totalQuantity * 0.2)) return InventoryStatus.lowStock;
+    if (availableQty < (totalRequiredQty * 0.2)) return InventoryStatus.lowStock;
     return InventoryStatus.inStock;
   }
 
@@ -29,9 +25,8 @@ class Inventory {
     required this.id,
     required this.productionId,
     required this.productName,
-    required this.totalQuantity,
+    required this.totalRequiredQty,
     required this.availableQty,
-    required this.allocatedQty,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -41,9 +36,8 @@ class Inventory {
       id: json['id'],
       productionId: json['production_id'],
       productName: json['product_name'],
-      totalQuantity: json['total_quantity'],
+      totalRequiredQty: json['total_required_qty'],
       availableQty: json['available_qty'],
-      allocatedQty: json['allocated_qty'],
       createdAt: DateTime.parse(json['created_at']),
       updatedAt: DateTime.parse(json['updated_at']),
     );
@@ -54,71 +48,34 @@ class Inventory {
       'id': id,
       'production_id': productionId,
       'product_name': productName,
-      'total_quantity': totalQuantity,
+      'total_required_qty': totalRequiredQty,
       'available_qty': availableQty,
-      'allocated_qty': allocatedQty,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
   }
-
-  Inventory copyWith({
-    String? id,
-    String? productionId,
-    String? productName,
-    int? totalQuantity,
-    int? availableQty,
-    int? allocatedQty,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-  }) {
-    return Inventory(
-      id: id ?? this.id,
-      productionId: productionId ?? this.productionId,
-      productName: productName ?? this.productName,
-      totalQuantity: totalQuantity ?? this.totalQuantity,
-      availableQty: availableQty ?? this.availableQty,
-      allocatedQty: allocatedQty ?? this.allocatedQty,
-      createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
-    );
-  }
 }
 
+// Simplified InventoryStatusData
 class InventoryStatusData {
   final String productName;
-  final String inventoryId;  // Changed from completionId
-  final int totalQuantity;
-  final int availableQuantity;
-  final int allocatedQuantity;
-
-  int get currentQuantity => availableQuantity - allocatedQuantity;
+  final String inventoryId;
+  final int totalRequiredQty;
+  final int availableQty;
 
   InventoryStatusData({
     required this.productName,
-    required this.inventoryId,  // Changed parameter name
-    required this.totalQuantity,
-    required this.availableQuantity,
-    required this.allocatedQuantity,
+    required this.inventoryId,
+    required this.totalRequiredQty,
+    required this.availableQty,
   });
 
   factory InventoryStatusData.fromJson(Map<String, dynamic> json) {
     return InventoryStatusData(
       productName: json['product_name'],
-      inventoryId: json['id'],  // Changed from completion_id
-      totalQuantity: json['total_quantity'] ?? 0,
-      availableQuantity: json['available_qty'] ?? 0,
-      allocatedQuantity: json['allocated_qty'] ?? 0,
+      inventoryId: json['id'],
+      totalRequiredQty: json['total_required_qty'] ?? 0,
+      availableQty: json['available_qty'] ?? 0,
     );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'product_name': productName,
-      'completion_id': inventoryId, // Serialize new field
-      'total_quantity': totalQuantity,
-      'allocated_quantity': allocatedQuantity,
-      'available_quantity': availableQuantity,
-    };
   }
 }

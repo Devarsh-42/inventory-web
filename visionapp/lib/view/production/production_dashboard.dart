@@ -11,6 +11,7 @@ import 'package:visionapp/view/production/production_details_screen.dart';
 import 'package:visionapp/view/production/production_management_screen.dart';
 import 'package:visionapp/view/production/production_queue_management_screen.dart';
 import 'package:visionapp/view/production/dispatch_screen.dart';
+import 'package:visionapp/viewmodels/inventory_viewmodel.dart';
 import 'package:visionapp/widgets/inventory_status_widget.dart';
 import 'widgets/productwise_dashboard_content.dart';
 import '../../viewmodels/production_viewmodel.dart';
@@ -33,11 +34,8 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final viewModel = Provider.of<ProductionViewModel>(context, listen: false);
-      final dispatchViewModel = Provider.of<DispatchViewModel>(context, listen: false);
-      
       viewModel.loadProductions();
       viewModel.loadProductNames();
-      dispatchViewModel.loadInventory(); // Add this line
     });
   }
 
@@ -287,81 +285,177 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
   }
 
   Widget _buildInventoryStatus() {
-    return Consumer<DispatchViewModel>(
-      builder: (context, dispatchViewModel, _) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 140),
+      width: double.infinity, // Add this
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Consumer<InventoryViewModel>(
+  builder: (context, inventoryViewModel, _) {
+    if (inventoryViewModel.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    
+    if (inventoryViewModel.error != null) {
+      return Center(child: Text(inventoryViewModel.error!));
+    }
+
+    if (inventoryViewModel.inventory.isEmpty) {
+      return const Center(child: Text('No inventory items available'));
+    }
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: inventoryViewModel.inventory.length,
+      itemBuilder: (context, index) {
+        final inventory = inventoryViewModel.inventory[index];
         return InventoryStatusWidget(
-          inventory: dispatchViewModel.productInventory,
-          isExpanded: true,
+          inventory: inventory
         );
       },
+    );
+  },
+),
     );
   }
 
   Widget _buildStatsGrid(ProductionViewModel viewModel) {
-    bool isMobile = ResponsiveHelper.isMobile(context);
-    
-    return SizedBox(
-      height: 180,
-      child: isMobile 
-        ? Column(
-            children: [
-              _buildInventoryStatus(),
-              const SizedBox(height: 16),
-              _buildStatCards(viewModel),
-            ],
-          )
-        : Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                flex: 3,
-                child: _buildInventoryStatus(),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        bool isMobile = ResponsiveHelper.isMobile(context);
+        
+        return Container(
+          width: double.infinity, // Ensure full width
+          constraints: const BoxConstraints(minHeight: 180),
+          child: isMobile 
+            ? Column(
+                mainAxisSize: MainAxisSize.min, // Add this
+                children: [
+                  Container(
+                    height: 140,
+                    width: double.infinity, // Add this
+                    child: _buildInventoryStatus(),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    height: 120,
+                    width: double.infinity, // Add this
+                    child: _buildStatCards(viewModel),
+                  ),
+                ],
+              )
+            : IntrinsicHeight( // Wrap with IntrinsicHeight
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: Container(
+                        width: double.infinity, // Add this
+                        child: _buildInventoryStatus(),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      flex: 2,
+                      child: Container(
+                        width: double.infinity, // Add this
+                        child: _buildStatCards(viewModel),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                flex: 2,
-                child: _buildStatCards(viewModel),
-              ),
-            ],
-          ),
+        );
+      }
     );
   }
 
   Widget _buildStatCards(ProductionViewModel viewModel) {
-    return Column(
-      mainAxisSize: MainAxisSize.min, // Take minimum required space
-      children: [
-        Flexible(
-          child: _buildStatCard(
-            title: 'IN PRODUCTION',
-            value: viewModel.getProductionsByStatus('in-progress').length,
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF1E40AF), Color(0xFF3B82F6)],
-            ),
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const ProductsScreen(),
+    bool isMobile = ResponsiveHelper.isMobile(context);
+    
+    return Container(
+      width: double.infinity, // Add this
+      constraints: const BoxConstraints(minHeight: 120),
+      child: isMobile
+        ? Row(
+            children: [
+              Expanded(
+                child: AspectRatio( // Wrap with AspectRatio
+                  aspectRatio: 1.5,
+                  child: _buildStatCard(
+                    title: 'IN PRODUCTION',
+                    value: viewModel.getProductionsByStatus('in-progress').length,
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFF1E40AF), Color(0xFF3B82F6)],
+                    ),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ProductsScreen(),
+                      ),
+                    ),
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: AspectRatio( // Wrap with AspectRatio
+                  aspectRatio: 1.5,
+                  child: _buildStatCard(
+                    title: 'READY TO SHIP',
+                    value: viewModel.getProductionsByStatus('completed').length,
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFF059669), Color(0xFF10B981)],
+                    ),
+                    onTap: _handleReadyToShipNavigation,
+                  ),
+                ),
+              ),
+            ],
+          )
+        : Column(
+            children: [
+              Expanded(
+                child: _buildStatCard(
+                  title: 'IN PRODUCTION',
+                  value: viewModel.getProductionsByStatus('in-progress').length,
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF1E40AF), Color(0xFF3B82F6)],
+                  ),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ProductsScreen(),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: _buildStatCard(
+                  title: 'READY TO SHIP',
+                  value: viewModel.getProductionsByStatus('completed').length,
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF059669), Color(0xFF10B981)],
+                  ),
+                  onTap: _handleReadyToShipNavigation,
+                ),
+              ),
+            ],
           ),
-        ),
-        const SizedBox(height: 8),
-        Flexible(
-          child: _buildStatCard(
-            title: 'READY TO SHIP',
-            value: viewModel.getProductionsByStatus('completed').length,
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF059669), Color(0xFF10B981)],
-            ),
-            onTap: _handleReadyToShipNavigation,
-          ),
-        ),
-      ],
     );
   }
 

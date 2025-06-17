@@ -17,16 +17,14 @@ class InventoryViewModel extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  // Get inventory metrics
+  // Get inventory metrics - simplified to only track required and available quantities
   Map<String, Map<String, int>> get inventoryMetrics {
     final metrics = <String, Map<String, int>>{};
     
     for (var item in _inventory) {
       metrics[item.productName] = {
-        'total': item.totalQuantity,
+        'required': item.totalRequiredQty,
         'available': item.availableQty,
-        'allocated': item.allocatedQty,
-        'current': item.currentQty,
       };
     }
     
@@ -56,37 +54,19 @@ class InventoryViewModel extends ChangeNotifier {
     }
   }
 
-  // Adjust quantities
-  Future<void> adjustQuantities(
-    String inventoryId, {
-    required int availableDelta,
-    required int allocatedDelta,
-  }) async {
+  // Consume inventory
+  Future<void> consumeInventory(String inventoryId, int amount) async {
     _setLoading(true);
     _clearError();
 
     try {
-      await _repository.adjustQuantities(
-        inventoryId,
-        availableDelta: availableDelta,
-        allocatedDelta: allocatedDelta,
-      );
+      await _repository.consumeInventory(inventoryId, amount);
       await loadInventory(); // Reload to get updated quantities
     } catch (e) {
-      _setError('Failed to adjust quantities: ${e.toString()}');
+      _setError('Failed to consume inventory: ${e.toString()}');
       rethrow;
     } finally {
       _setLoading(false);
-    }
-  }
-
-  // Check availability
-  Future<bool> checkAvailability(String inventoryId, int quantity) async {
-    try {
-      return await _repository.checkAvailability(inventoryId, quantity);
-    } catch (e) {
-      _setError('Failed to check availability: ${e.toString()}');
-      return false;
     }
   }
 

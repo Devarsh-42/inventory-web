@@ -22,25 +22,18 @@ class InventoryRepository {
     }
   }
 
-  Future<void> allocateInventory({
-    required String inventoryId,
-    required String queueId,
-    required int quantity,
-  }) async {
+  Future<void> consumeInventory(String inventoryId, int amount) async {
     try {
-      await _supabaseService.client.rpc(
-        'allocate_inventory_to_queue',
-        params: {
-          'p_inventory_id': inventoryId,
-          'p_queue_id': queueId,
-          'p_quantity': quantity,
-        },
-      );
+      await _supabaseService.client
+          .from(_tableName)
+          .update({'available_qty': 'available_qty - $amount'})
+          .eq('id', inventoryId)
+          .gte('available_qty', amount);
     } catch (e) {
-      throw Exception('Failed to allocate inventory: $e');
+      throw Exception('Failed to consume inventory: $e');
     }
   }
-  
+
   Future<Inventory> getInventoryById(String id) async {
     try {
       final response = await _supabaseService.client
@@ -52,34 +45,6 @@ class InventoryRepository {
       return Inventory.fromJson(response);
     } catch (e) {
       throw Exception('Failed to fetch inventory item: $e');
-    }
-  }
-
-  Future<void> adjustQuantities(
-    String inventoryId, {
-    required int availableDelta,
-    required int allocatedDelta,
-  }) async {
-    try {
-      await _supabaseService.client.rpc(
-        'adjust_inventory_quantities',
-        params: {
-          'p_inventory_id': inventoryId,
-          'p_available_delta': availableDelta,
-          'p_allocated_delta': allocatedDelta,
-        },
-      );
-    } catch (e) {
-      throw Exception('Failed to adjust quantities: $e');
-    }
-  }
-
-  Future<bool> checkAvailability(String inventoryId, int requestedQuantity) async {
-    try {
-      final inventory = await getInventoryById(inventoryId);
-      return inventory.availableQty >= requestedQuantity;
-    } catch (e) {
-      throw Exception('Failed to check availability: $e');
     }
   }
 }

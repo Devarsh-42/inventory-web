@@ -17,59 +17,49 @@ class ProductionQueueRepository {
           .from(_tableName)
           .select('''
             *,
-            inventory!inner (
+            inventory:inventory_id (
               id,
               production_id,
               product_name,
-              total_quantity,
+              total_required_qty,
               available_qty,
-              allocated_qty,
               created_at,
               updated_at
             )
           ''')
           .order('queue_position');
 
-      if (response == null) {
-        return [];
-      }
-
       return (response as List)
-          .where((item) => item != null)
-          .map((item) {
-            try {
-              return ProductionQueueItem.fromJson(Map<String, dynamic>.from(item));
-            } catch (e) {
-              return null;
-            }
-          })
-          .whereType<ProductionQueueItem>()
+          .map((item) => ProductionQueueItem.fromJson(item))
           .toList();
     } catch (e) {
       throw Exception('Failed to fetch production queue: $e');
     }
   }
 
-  // Add to queue with priority
+  /// Adds to queue via RPC, passing `inventory_id` instead of product name
   Future<void> addToQueueWithPriority(String inventoryId, int quantity) async {
     try {
       await _supabaseService.client.rpc(
         'add_to_production_queue',
-        params: {'p_inventory_id': inventoryId, 'p_quantity': quantity},
+        params: {
+          'p_inventory_id': inventoryId,
+          'p_quantity': quantity,
+        },
       );
     } catch (e) {
       throw Exception('Failed to add to queue with priority: $e');
     }
   }
 
-  // Add to queue (normal)
+  /// Same “normal” add, now using inventoryId
   Future<void> addToQueue(String inventoryId, int quantity) async {
     try {
       await _supabaseService.client.rpc(
         'add_to_production_queue',
         params: {
           'p_inventory_id': inventoryId,
-          'p_quantity': quantity
+          'p_quantity': quantity,
         },
       );
     } catch (e) {
@@ -115,9 +105,12 @@ class ProductionQueueRepository {
     try {
       await _supabaseService.client.rpc(
         'reorder_production_queue',
-        params: {'p_queue_ids': orderedIds},
+        params: {
+          'p_queue_ids': orderedIds,
+        },
       );
     } catch (e) {
+      print('Error details: ${e.toString()}'); // Add logging for debugging
       throw Exception('Failed to update queue order: $e');
     }
   }
@@ -150,9 +143,8 @@ class ProductionQueueRepository {
         result[item['product_name']] = InventoryStatusData(
           productName: item['product_name'],
           inventoryId: item['id'],
-          totalQuantity: item['total_quantity'] ?? 0,
-          availableQuantity: item['available_qty'] ?? 0,
-          allocatedQuantity: item['allocated_qty'] ?? 0,
+          totalRequiredQty: item['total_required_qty'], // Add default value
+          availableQty: item['available_qty'] ?? 0, // Map to available_qty field
         );
       }
       return result;

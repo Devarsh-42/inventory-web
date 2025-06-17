@@ -8,41 +8,55 @@ class Production {
   final int completedQuantity;
   final String status;
   final DateTime createdAt;
+  final DateTime updatedAt;
   final String? orderId;
+  final int availableQuantity;
   final Map<String, dynamic>? orderDetails;
   final Map<String, dynamic>? orders; // Add this field
-  final int availableQuantity;
+
+  static const String STATUS_IN_PRODUCTION = 'in_production';
+  static const String STATUS_COMPLETED = 'completed';
+  static const String STATUS_READY = 'ready';
+  static const String STATUS_SHIPPED = 'shipped';
+
+  static const List<String> VALID_STATUSES = [
+    STATUS_IN_PRODUCTION,
+    STATUS_COMPLETED,
+    STATUS_READY,
+    STATUS_SHIPPED
+  ];
 
   double get progress => completedQuantity / targetQuantity;
   bool get isCompleted => status == 'completed';
 
   Production({
-    String? id,
+    required this.id,
     required this.productName,
     required this.targetQuantity,
-    this.completedQuantity = 0,
+    required this.completedQuantity,
     required this.status,
-    DateTime? createdAt,
+    required this.createdAt,
+    required this.updatedAt,
     this.orderId,
+    this.availableQuantity = 0,
     this.orderDetails,
     this.orders, // Add this parameter
-    this.availableQuantity = 0, // Add default value
-  }) : 
-    this.id = id ?? const Uuid().v4(),
-    this.createdAt = createdAt ?? DateTime.now();
+  }) : assert(VALID_STATUSES.contains(status), 'Invalid status');
 
+  // Update fromJson to include orderDetails
   factory Production.fromJson(Map<String, dynamic> json) {
     return Production(
       id: json['id'],
-      productName: json['product_name'] ?? '',
-      targetQuantity: json['target_quantity'] ?? 0,
+      productName: json['product_name'],
+      targetQuantity: json['target_quantity'],
       completedQuantity: json['completed_quantity'] ?? 0,
-      status: json['status'] ?? 'in_production',
+      status: json['status'],
       createdAt: DateTime.parse(json['created_at']),
-      orderId: json['order_id'], // This should now be correctly populated
-      orderDetails: json['order_details'] as Map<String, dynamic>?, // This should contain display_id
-      orders: json['orders'] as Map<String, dynamic>?, // Map the orders field
-      availableQuantity: json['available_quantity'] ?? 0,
+      updatedAt: DateTime.parse(json['updated_at']),
+      orderId: json['order_id'],
+      availableQuantity: json['available_qty'] ?? 0,
+      orderDetails: json['order_details'],
+      orders: json['orders'], // Add this field
     );
   }
 
@@ -54,26 +68,16 @@ class Production {
       'completed_quantity': completedQuantity,
       'status': status,
       'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
       'order_id': orderId,
-      'order_details': orderDetails,
-      'available_quantity': availableQuantity,
     };
   }
 
-  static const String STATUS_IN_PRODUCTION = 'in_production';
-  static const String STATUS_COMPLETED = 'completed';
-  static const String STATUS_READY = 'ready';
-  static const String STATUS_SHIPPED = 'shipped';
-
   static bool isValidStatus(String status) {
-    return [
-      STATUS_IN_PRODUCTION,  // when product added
-      STATUS_READY,         // when marked ready in dispatch
-      STATUS_COMPLETED,     // when marked completed in queue
-      STATUS_SHIPPED       // when marked shipped
-    ].contains(status);
+    return VALID_STATUSES.contains(status);
   }
 
+  // Update copyWith to include orderDetails
   Production copyWith({
     String? id,
     String? productName,
@@ -81,10 +85,11 @@ class Production {
     int? completedQuantity,
     String? status,
     DateTime? createdAt,
+    DateTime? updatedAt,
     String? orderId,
+    int? availableQuantity,
     Map<String, dynamic>? orderDetails,
     Map<String, dynamic>? orders, // Add this parameter
-    int? availableQuantity, // Add this parameter
   }) {
     return Production(
       id: id ?? this.id,
@@ -93,10 +98,11 @@ class Production {
       completedQuantity: completedQuantity ?? this.completedQuantity,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
       orderId: orderId ?? this.orderId,
+      availableQuantity: availableQuantity ?? this.availableQuantity,
       orderDetails: orderDetails ?? this.orderDetails,
       orders: orders ?? this.orders, // Add this field
-      availableQuantity: availableQuantity ?? this.availableQuantity, // Add this field
     );
   }
 }

@@ -5,7 +5,8 @@ import 'package:visionapp/pallet.dart'; // Add this import
 import 'package:visionapp/view/admin/admin_dashboard.dart';
 import 'package:visionapp/view/management/dashboard.dart';
 import 'package:visionapp/view/production/production_dashboard.dart';
-import 'package:visionapp/view/routes/app_routes.dart'; 
+import 'package:visionapp/view/routes/app_routes.dart';
+import 'package:visionapp/view/sales/sales_dashboard.dart'; 
 import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -61,6 +62,11 @@ class _LoginScreenState extends State<LoginScreen> {
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(builder: (context) => const ProductionDashboardScreen()),
+            );
+          } else if (userData['role'] == 'sales') {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const SalesDashboardScreen()),
             );
           } else {
             ScaffoldMessenger.of(context).showSnackBar(

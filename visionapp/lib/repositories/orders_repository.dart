@@ -8,7 +8,7 @@ class OrdersRepository {
 
   OrdersRepository() : _supabaseService = SupabaseService.instance;
 
- Future<List<Order>> getAllOrders() async {
+  Future<List<Order>> getAllOrders() async {
     try {
       final response = await _supabaseService.client
           .from(_tableName)
@@ -24,46 +24,49 @@ class OrdersRepository {
     }
   }
 
-    Future<Order> createOrder(Order order) async {
-  try {
-    // Insert the order first
-    final orderResponse = await _supabaseService.client
-        .from(_tableName)
-        .insert({
-          'client_id': order.clientId,
-          'client_name': order.clientName,
-          'due_date': order.dueDate.toIso8601String(),
-          'status': order.status.toString().split('.').last.toLowerCase(),
-          'priority': order.priority.toString().split('.').last.toLowerCase(),
-          'special_instructions': order.specialInstructions,
-          'created_date': DateTime.now().toIso8601String(),
-        })
-        .select()
-        .single();
-
-    // Insert order products
-    final productsData = order.products.map((product) => {
-      'order_id': orderResponse['id'],
-      'product_id': product.productId,
-      'quantity': product.quantity,
-      'completed': product.completed,
-    }).toList();
-
-    await _supabaseService.client.from(_productsTable).insert(productsData);
-
-    return getOrderById(orderResponse['id']);
-  } catch (e) {
-    throw Exception('Failed to create order: $e');
-  }
-}
-
-
-Future<void> deleteOrder(String orderId) async {
+  Future<Order> createOrder(Order order) async {
     try {
-      await _supabaseService.client
-          .from(_tableName)
-          .delete()
-          .eq('id', orderId);
+      // Insert the order first
+      final orderResponse =
+          await _supabaseService.client
+              .from(_tableName)
+              .insert({
+                'client_id': order.clientId,
+                'client_name': order.clientName,
+                'due_date': order.dueDate.toIso8601String(),
+                'status': order.status.toString().split('.').last.toLowerCase(),
+                'priority':
+                    order.priority.toString().split('.').last.toLowerCase(),
+                'special_instructions': order.specialInstructions,
+                'created_date': DateTime.now().toIso8601String(),
+              })
+              .select()
+              .single();
+
+      // Insert order products
+      final productsData =
+          order.products
+              .map(
+                (product) => {
+                  'order_id': orderResponse['id'],
+                  'product_id': product.productId,
+                  'quantity': product.quantity,
+                  'completed': product.completed,
+                },
+              )
+              .toList();
+
+      await _supabaseService.client.from(_productsTable).insert(productsData);
+
+      return getOrderById(orderResponse['id']);
+    } catch (e) {
+      throw Exception('Failed to create order: $e');
+    }
+  }
+
+  Future<void> deleteOrder(String orderId) async {
+    try {
+      await _supabaseService.client.from(_tableName).delete().eq('id', orderId);
     } catch (e) {
       throw Exception('Failed to delete order: $e');
     }
@@ -86,7 +89,7 @@ Future<void> deleteOrder(String orderId) async {
 
   Future<void> updateProductCompletion(
     String orderId,
-    String productId,  // Changed from productName
+    String productId, // Changed from productName
     int completedCount,
   ) async {
     try {
@@ -94,7 +97,7 @@ Future<void> deleteOrder(String orderId) async {
           .from('order_products')
           .update({'completed': completedCount})
           .eq('order_id', orderId)
-          .eq('product_id', productId);  // Changed from name to product_id
+          .eq('product_id', productId); // Changed from name to product_id
     } catch (e) {
       throw Exception('Failed to update product completion: $e');
     }
@@ -103,40 +106,41 @@ Future<void> deleteOrder(String orderId) async {
   Future<Order> duplicateOrder(Order order) async {
     try {
       // Create new order without ID
-      final orderData = order.toJson()
-        ..remove('id')
-        ..['created_date'] = DateTime.now().toIso8601String()
-        ..['status'] = OrderStatus.in_production.toString().split('.').last;
+      final orderData =
+          order.toJson()
+            ..remove('id')
+            ..['created_date'] = DateTime.now().toIso8601String()
+            ..['status'] = OrderStatus.in_production.toString().split('.').last;
 
-      final orderResponse = await _supabaseService.client
-          .from(_tableName)
-          .insert(orderData)
-          .select()
-          .single();
+      final orderResponse =
+          await _supabaseService.client
+              .from(_tableName)
+              .insert(orderData)
+              .select()
+              .single();
 
       // Duplicate products for new order
       await Future.wait(
         order.products.map((product) async {
-          await _supabaseService.client
-              .from(_productsTable)
-              .insert({
-                'order_id': orderResponse['id'],
-                'product_id': product.productId,
-                'quantity': product.quantity,
-                'completed': 0, // Reset completed count
-              });
+          await _supabaseService.client.from(_productsTable).insert({
+            'order_id': orderResponse['id'],
+            'product_id': product.productId,
+            'quantity': product.quantity,
+            'completed': 0, // Reset completed count
+          });
         }),
       );
 
       // Return new order with products
-      final response = await _supabaseService.client
-          .from(_tableName)
-          .select('''
+      final response =
+          await _supabaseService.client
+              .from(_tableName)
+              .select('''
             *,
             products:$_productsTable(*)
           ''')
-          .eq('id', orderResponse['id'])
-          .single();
+              .eq('id', orderResponse['id'])
+              .single();
 
       return Order.fromJson(response);
     } catch (e) {
@@ -147,19 +151,20 @@ Future<void> deleteOrder(String orderId) async {
   Future<Order> updateOrder(Order order) async {
     try {
       // Update the order
-      final orderResponse = await _supabaseService.client
-          .from(_tableName)
-          .update({
-            'client_name': order.clientName,
-            'due_date': order.dueDate.toIso8601String(),
-            'status': order.status.toString().split('.').last,
-            'priority': order.priority.toString().split('.').last,
-            'special_instructions': order.specialInstructions,
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', order.id)
-          .select()
-          .single();
+      final orderResponse =
+          await _supabaseService.client
+              .from(_tableName)
+              .update({
+                'client_name': order.clientName,
+                'due_date': order.dueDate.toIso8601String(),
+                'status': order.status.toString().split('.').last,
+                'priority': order.priority.toString().split('.').last,
+                'special_instructions': order.specialInstructions,
+                'updated_at': DateTime.now().toIso8601String(),
+              })
+              .eq('id', order.id)
+              .select()
+              .single();
 
       // Delete existing products
       await _supabaseService.client
@@ -170,14 +175,12 @@ Future<void> deleteOrder(String orderId) async {
       // Create new products
       await Future.wait(
         order.products.map((product) async {
-          await _supabaseService.client
-              .from(_productsTable)
-              .insert({
-                'order_id': order.id,
-                'product_id': product.productId,  // Changed from name
-                'quantity': product.quantity,
-                'completed': product.completed,
-              });
+          await _supabaseService.client.from(_productsTable).insert({
+            'order_id': order.id,
+            'product_id': product.productId, // Changed from name
+            'quantity': product.quantity,
+            'completed': product.completed,
+          });
         }),
       );
 
@@ -189,14 +192,15 @@ Future<void> deleteOrder(String orderId) async {
 
   Future<Order> getOrderById(String orderId) async {
     try {
-      final response = await _supabaseService.client
-          .from(_tableName)
-          .select('''
+      final response =
+          await _supabaseService.client
+              .from(_tableName)
+              .select('''
             *,
             products:$_productsTable(*)
           ''')
-          .eq('id', orderId)
-          .single();
+              .eq('id', orderId)
+              .single();
 
       return Order.fromJson(response);
     } catch (e) {
@@ -233,7 +237,7 @@ Future<void> deleteOrder(String orderId) async {
   }
 
   Future<Map<String, Map<String, dynamic>>> getOrderDetailsForProductions(
-    List<String> orderIds
+    List<String> orderIds,
   ) async {
     try {
       if (orderIds.isEmpty) return {};
@@ -255,15 +259,14 @@ Future<void> deleteOrder(String orderId) async {
           .inFilter('id', orderIds);
 
       return Map.fromEntries(
-        (response as List).map((order) => MapEntry(
-          order['id'],
-          {
+        (response as List).map(
+          (order) => MapEntry(order['id'], {
             'clientName': order['clients']['name'] ?? order['client_name'],
             'displayId': order['display_id'],
             'priority': order['priority'],
             'dueDate': DateTime.parse(order['due_date']),
-          },
-        )),
+          }),
+        ),
       );
     } catch (e) {
       throw Exception('Failed to fetch order details: $e');
@@ -277,11 +280,12 @@ Future<void> deleteOrder(String orderId) async {
   }) async {
     try {
       // First check if the order is in an editable state
-      final orderStatus = await _supabaseService.client
-          .from('orders')
-          .select('status')
-          .eq('id', orderId)
-          .single();
+      final orderStatus =
+          await _supabaseService.client
+              .from('orders')
+              .select('status')
+              .eq('id', orderId)
+              .single();
 
       final status = orderStatus['status'] as String;
       if (['ready', 'completed', 'shipped'].contains(status.toLowerCase())) {
@@ -301,7 +305,7 @@ Future<void> deleteOrder(String orderId) async {
       // Call the stored procedure to check and update order status
       await _supabaseService.client.rpc(
         'check_order_completion',
-        params: {'order_id_param': orderId}
+        params: {'order_id_param': orderId},
       );
     } catch (e) {
       throw Exception('Failed to update product quantity: $e');
@@ -313,11 +317,23 @@ Future<void> deleteOrder(String orderId) async {
       await _supabaseService.client.rpc(
         'delete_finished_orders',
         params: {
-          'status_list': ['completed', 'ready', 'shipped']
-        }
+          'status_list': ['completed', 'ready', 'shipped'],
+        },
       );
     } catch (e) {
       throw Exception('Failed to delete finished orders: $e');
+    }
+  }
+
+  Future<void> deleteShippedOrders() async {
+    try {
+      // This will cascade delete from orders_products and productions due to FK constraints
+      await _supabaseService.client
+          .from(_tableName)
+          .delete()
+          .eq('status', 'shipped');
+    } catch (e) {
+      throw Exception('Failed to delete shipped orders: $e');
     }
   }
 }

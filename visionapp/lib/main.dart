@@ -4,7 +4,6 @@ import 'package:visionapp/provider.dart';
 import 'package:visionapp/view/auth/login_screen.dart';
 import 'package:visionapp/view/production/production_dashboard.dart';
 import 'package:visionapp/view/admin/admin_dashboard.dart';
-import 'package:visionapp/view/sales/sales_dashboard.dart';
 import 'core/services/supabase_services.dart';
 import 'core/navigation/navigation_service.dart';
 
@@ -21,7 +20,7 @@ class MyApp extends StatelessWidget {
       providers: AppProviders.providers,
       child: MaterialApp(
         navigatorKey: NavigationService.navigatorKey,
-        title: 'Sypply Chain Management System',
+        title: 'Supply Chain Management System',
         theme: ThemeData(
           primarySwatch: Colors.blue,
           visualDensity: VisualDensity.adaptivePlatformDensity,

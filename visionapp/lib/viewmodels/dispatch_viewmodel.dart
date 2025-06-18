@@ -114,6 +114,19 @@ Future<void> loadInventory() async {
     }
   }
 
+  // Delete shipped dispatch
+  Future<void> deleteShippedDispatch(String dispatchId) async {
+    try {
+      _setLoading(true);
+      await _repository.deleteShippedDispatch(dispatchId);
+      await loadDispatchItems(); // Reload items after deletion
+    } catch (e) {
+      _setError(e.toString());
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   // Helper methods
   void _setLoading(bool loading) {
     _isLoading = loading;

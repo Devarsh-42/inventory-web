@@ -67,14 +67,14 @@ class DispatchRepository {
     }
   }
 
-  Future<void> deleteDispatch(String dispatchId) async {
+  Future<void> deleteShippedDispatch(String dispatchId) async {
     try {
-      await _supabaseService.client
-          .from('dispatch')
-          .delete()
-          .eq('id', dispatchId);
+      await _supabaseService.client.rpc(
+        'delete_shipped_dispatch_and_update_inventory',
+        params: {'p_dispatch_id': dispatchId},
+      );
     } catch (e) {
-      throw Exception('Failed to delete dispatch: $e');
+      throw Exception('Failed to delete shipped dispatch: $e');
     }
   }
 }

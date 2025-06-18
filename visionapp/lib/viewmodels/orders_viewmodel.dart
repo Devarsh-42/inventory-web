@@ -199,6 +199,17 @@ class OrdersViewModel extends ChangeNotifier {
     }
   }
 
+  Future<void> deleteShippedOrders() async {
+    try {
+      await _ordersRepository.deleteShippedOrders();
+      await loadOrders(); // Reload orders to refresh the list
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      throw e;
+    }
+  }
+
   List<Order> get recentOrders {
     final sortedOrders = List<Order>.from(_orders)
       ..sort((a, b) => b.createdDate.compareTo(a.createdDate));

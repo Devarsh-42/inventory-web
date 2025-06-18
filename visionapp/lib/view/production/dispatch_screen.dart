@@ -512,6 +512,22 @@ class _DispatchScreenState extends State<DispatchScreen> {
         backgroundColor: primaryPurple,
         foregroundColor: Colors.white,
         actions: [
+          // Add Delete Shipped Items button
+          Consumer<DispatchViewModel>(
+            builder: (context, viewModel, _) {
+              final shippedDispatches = viewModel.groupedDispatchItems
+                  .where((d) => d.status == 'shipped')
+                  .toList();
+
+              return IconButton(
+                icon: const Icon(Icons.delete_sweep, size: 20),
+                tooltip: 'Delete Shipped Items',
+                onPressed: shippedDispatches.isEmpty
+                    ? null
+                    : () => _showDeleteShippedDialog(shippedDispatches),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.refresh, size: 20),
             onPressed: () {
@@ -678,5 +694,97 @@ class _DispatchScreenState extends State<DispatchScreen> {
       ),
       bottomNavigationBar: const ProductionBottomNav(currentRoute: '/dispatch'),
     );
+  }
+
+  Future<void> _showDeleteShippedDialog(List<ClientDispatch> shippedDispatches) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Icon(
+                Icons.delete_forever,
+                color: Colors.red,
+                size: 18,
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Text('Delete Shipped Items', style: TextStyle(fontSize: 16)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'This will delete the following shipped dispatches:',
+              style: TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            ...shippedDispatches.map(
+              (dispatch) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  '• ${dispatch.clientName} (${dispatch.items.length} items)',
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'This action cannot be undone.',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.red[700],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel', style: TextStyle(fontSize: 13)),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pop(context, true),
+            icon: const Icon(Icons.delete_forever, size: 16),
+            label: const Text('Delete', style: TextStyle(fontSize: 13)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true) {
+      final viewModel = context.read<DispatchViewModel>();
+      try {
+        for (final dispatch in shippedDispatches) {
+          await viewModel.deleteShippedDispatch(dispatch.dispatchId);
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Successfully deleted shipped items'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error deleting shipped items: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }

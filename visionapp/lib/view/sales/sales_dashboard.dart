@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:visionapp/core/services/supabase_services.dart';
 import 'package:visionapp/models/orders.dart';
 import 'package:visionapp/view/auth/login_screen.dart';
 import 'package:visionapp/view/sales/order_placement_screen.dart';
+import 'package:visionapp/view/widgets/custom_textfield.dart';
 import 'package:visionapp/viewmodels/client_viewmodel.dart';
 import 'package:visionapp/viewmodels/orders_viewmodel.dart';
 import 'package:visionapp/viewmodels/products_viewmodel.dart';
@@ -31,12 +33,21 @@ class SalesDashboardScreen extends StatefulWidget {
 }
 
 class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  OrderStatus? _selectedStatusFilter;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadData();
     });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -174,6 +185,10 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
                   _buildStatsGrid(ordersViewModel, clientViewModel),
                   SizedBox(height: isMobile ? 20 : 24),
                   
+                  // Add Search and Filter Section
+                  _buildSearchAndFilter(),
+                  SizedBox(height: isMobile ? 20 : 24),
+                  
                   // Sales Performance Chart
                   _buildSalesChart(),
                   SizedBox(height: isMobile ? 20 : 24),
@@ -254,25 +269,12 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
           color: const Color(0xFF059669),
         ),
         _buildStatCard(
-          title: 'Units in Queue',
+          title: 'Units in Production',
           value: '${ordersViewModel.totalUnitsInQueue}',
           icon: Icons.inventory,
           color: const Color(0xFF0EA5E9),
         ),
-        if (!isMobile || isDesktop) ...[
-          _buildStatCard(
-            title: 'Total Clients',
-            value: '${clientViewModel.clients.length}',
-            icon: Icons.people,
-            color: const Color(0xFF8B5CF6),
-          ),
-          _buildStatCard(
-            title: 'This Month',
-            value: '₹${(totalRevenue / 100000).toStringAsFixed(1)}L',
-            icon: Icons.trending_up,
-            color: const Color(0xFFEF4444),
-          ),
-        ],
+        
       ],
     );
   }
@@ -420,7 +422,8 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
   }
 
   Widget _buildRecentOrdersSection(OrdersViewModel ordersViewModel) {
-    final recentOrders = ordersViewModel.recentOrders;
+    // Change from recentOrders to filteredOrders
+    final filteredOrders = ordersViewModel.filteredOrders;
     final isMobile = ResponsiveHelper.isMobile(context);
     
     return Column(
@@ -431,11 +434,11 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
           children: [
             Expanded(
               child: Text(
-                'Recent Orders',
+                'Orders',  // Changed from 'Recent Orders' to just 'Orders'
                 style: TextStyle(
                   fontSize: isMobile ? 16 : 18,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF1F2937),
+                  color: const Color(0xFF1F2937),
                   letterSpacing: -0.3,
                 ),
               ),
@@ -452,7 +455,7 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
           ],
         ),
         const SizedBox(height: 16),
-        if (recentOrders.isEmpty)
+        if (filteredOrders.isEmpty)
           Container(
             padding: EdgeInsets.all(isMobile ? 20 : 24),
             decoration: BoxDecoration(
@@ -485,9 +488,9 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
           ListView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            itemCount: recentOrders.length,
+            itemCount: filteredOrders.length,
             itemBuilder: (context, index) {
-              final order = recentOrders[index];
+              final order = filteredOrders[index];
               return _buildOrderCard(order);
             },
           ),
@@ -665,8 +668,8 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
   }
 
   String _getCurrentSalesPersonName() {
-    // This would typically come from user session/auth
-    return 'Raj Patel';
+    final currentUser = SupabaseService.instance.currentUser;
+    return currentUser?.email?.split('@')[0] ?? 'Unknown User';
   }
 
   String _formatDate(DateTime date) {
@@ -722,5 +725,152 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
       case OrderStatus.ready:
         return 'Ready';
     }
+  }
+
+  Widget _buildSearchAndFilter() {
+    final isMobile = ResponsiveHelper.isMobile(context);
+    
+    return Container(
+      padding: EdgeInsets.all(isMobile ? 16 : 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          CustomTextField(
+            label: 'Search orders by client name or order ID...',
+            controller: _searchController,
+            prefixIcon: const Icon(Icons.search, color: Color(0xFF6B7280)),
+            onChanged: (value) {
+              Provider.of<OrdersViewModel>(context, listen: false).searchOrders(value);
+            },
+            placeholder: 'Enter client name or order ID', // Optional placeholder text
+          ),
+          const SizedBox(height: 16),
+          _buildSortOptions(),
+          const SizedBox(height: 16),
+Row(
+          children: [
+            Expanded(
+              child: DropdownButtonFormField<OrderStatus?>(
+                value: _selectedStatusFilter,
+                decoration: InputDecoration(
+                  labelText: 'Filter by Status',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  filled: true,
+                  fillColor: Colors.white,
+                ),
+                items: [
+                  const DropdownMenuItem<OrderStatus?>(
+                    value: null,
+                    child: Text('All Statuses'),
+                  ),
+                  ...OrderStatus.values.map((status) => DropdownMenuItem(
+                    value: status,
+                    child: Text(_getStatusText(status)),
+                  )),
+                ],
+                onChanged: (value) {
+                  setState(() {
+                    _selectedStatusFilter = value;
+                  });
+                  Provider.of<OrdersViewModel>(context, listen: false)
+                      .filterOrdersByStatus(value);
+                },
+              ),
+            ),
+          ],
+        ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSortOptions() {
+    return Row(
+      children: [
+        const Text(
+          'Sort by: ',
+          style: TextStyle(
+            color: Color(0xFF6B7280),
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildSortChip('Priority', OrderSortOption.priority),
+                const SizedBox(width: 8),
+                _buildSortChip('Due Date', OrderSortOption.dueDate),
+                const SizedBox(width: 8),
+                _buildSortChip('Created Date', OrderSortOption.createdDate),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSortChip(String label, OrderSortOption option) {
+    return Consumer<OrdersViewModel>(
+      builder: (context, viewModel, _) {
+        final isSelected = viewModel.currentSort == option;
+        return FilterChip(
+          selected: isSelected,
+          label: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(label),
+              if (isSelected) ...[
+                const SizedBox(width: 4),
+                Icon(
+                  viewModel.sortAscending
+                      ? Icons.arrow_upward
+                      : Icons.arrow_downward,
+                  size: 16,
+                ),
+              ],
+            ],
+          ),
+          onSelected: (_) {
+            viewModel.sortOrders(option);
+          },
+          backgroundColor: Colors.white,
+          selectedColor: const Color(0xFF059669).withOpacity(0.1),
+          labelStyle: TextStyle(
+            color: isSelected
+                ? const Color(0xFF059669)
+                : const Color(0xFF6B7280),
+            fontWeight: isSelected
+                ? FontWeight.bold
+                : FontWeight.normal,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(
+              color: isSelected
+                  ? const Color(0xFF059669)
+                  : const Color(0xFFE5E7EB),
+            ),
+          ),
+        );
+      },
+    );
   }
 }

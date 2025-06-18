@@ -100,7 +100,7 @@ class ProductionBottomNav extends StatelessWidget {
             decoration: BoxDecoration(
               gradient: isActive
                   ? const LinearGradient(
-                      colors: [Color(0xFF1E40AF), Color(0xFF3B82F6)],
+                      colors: [Color(0xFF7D3DD6), Color(0xFF9D67E2)], // Updated gradient colors
                     )
                   : null,
               color: isActive ? null : const Color(0xFF64748B).withOpacity(0.2),
@@ -119,7 +119,7 @@ class ProductionBottomNav extends StatelessWidget {
               fontSize: 10,
               fontWeight: FontWeight.w600,
               color:
-                  isActive ? const Color(0xFF1E40AF) : const Color(0xFF64748B),
+                  isActive ? const Color(0xFF7D3DD6) : const Color(0xFF64748B), // Updated active text color
             ),
           ),
         ],

@@ -140,22 +140,45 @@ class _AdminDashboardState extends State<AdminDashboard> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Finished Orders'),
-        content: const Text(
-          'This will permanently delete all completed, ready, and shipped orders. '
-          'This action cannot be undone. Are you sure?'
+        title: const Text('Delete Orders'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Choose which orders to delete:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () {
+                context.read<OrdersViewModel>().deleteAllFinishedOrders();
+                Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                minimumSize: const Size(double.infinity, 44),
+              ),
+              child: const Text('Delete All Finished Orders\n(Completed, Ready, Shipped)'),
+            ),
+            const SizedBox(height: 8),
+            ElevatedButton(
+              onPressed: () {
+                context.read<OrdersViewModel>().deleteShippedOrders();
+                Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                minimumSize: const Size(double.infinity, 44),
+              ),
+              child: const Text('Delete Only Shipped Orders'),
+            ),
+          ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              context.read<OrdersViewModel>().deleteAllFinishedOrders();
-              Navigator.pop(context);
-            },
-            child: const Text('Delete'),
           ),
         ],
       ),

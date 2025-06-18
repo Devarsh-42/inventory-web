@@ -25,6 +25,7 @@ class _ProductsScreenState extends State<ProductsScreen>
   void initState() {
     super.initState();
     context.read<ProductionViewModel>().loadProductions();
+    context.read<InventoryViewModel>().loadInventory();
   }
 
   @override
@@ -36,13 +37,17 @@ class _ProductsScreenState extends State<ProductsScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1E3A8A),
+      backgroundColor: const Color(0xFF9349fc), // Changed this line
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF1E3A8A), Color(0xFF3B82F6), Color(0xFF1E40AF)],
+            colors: [
+              Color(0xFF7637ca), // Darker shade of #9349fc
+              Color(0xFF9349fc), // Main color
+              Color(0xFFa76bfd), // Lighter shade of #9349fc
+            ],
           ),
         ),
         child: SafeArea(
@@ -64,32 +69,43 @@ class _ProductsScreenState extends State<ProductsScreen>
                       ),
                     ),
                     const SizedBox(height: 16),
-                    Consumer<InventoryViewModel>(
-                      builder: (context, inventoryViewModel, _) {
-                        if (inventoryViewModel.isLoading) {
-                          return const Center(child: CircularProgressIndicator());
-                        }
-                        
-                        if (inventoryViewModel.error != null) {
-                          return Center(child: Text(inventoryViewModel.error!));
-                        }
+                    // Make Inventory Status List Scrollable Horizontally
+                    SizedBox(
+                      height: 120, // Fixed height for inventory status
+                      child: Consumer<InventoryViewModel>(
+                        builder: (context, inventoryViewModel, _) {
+                          if (inventoryViewModel.isLoading) {
+                            return const Center(child: CircularProgressIndicator());
+                          }
+                          
+                          if (inventoryViewModel.error != null) {
+                            return Center(child: Text(inventoryViewModel.error!));
+                          }
 
-                        if (inventoryViewModel.inventory.isEmpty) {
-                          return const Center(child: Text('No inventory items available'));
-                        }
-
-                        return ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: inventoryViewModel.inventory.length,
-                          itemBuilder: (context, index) {
-                            final inventory = inventoryViewModel.inventory[index];
-                            return InventoryStatusWidget(
-                              inventory: inventory
+                          if (inventoryViewModel.inventory.isEmpty) {
+                            return const Center(
+                              child: Text('No inventory items available')
                             );
-                          },
-                        );
-                      },
+                          }
+
+                          return ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: inventoryViewModel.inventory.length,
+                            itemBuilder: (context, index) {
+                              final inventory = inventoryViewModel.inventory[index];
+                              return SizedBox(
+                                width: 300, // Fixed width for inventory card
+                                child: Padding(
+                                  padding: const EdgeInsets.only(right: 16),
+                                  child: InventoryStatusWidget(
+                                    inventory: inventory
+                                  ),
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
                     ),
                     const SizedBox(height: 16),
                     const Text(
@@ -104,7 +120,7 @@ class _ProductsScreenState extends State<ProductsScreen>
                 ),
               ),
 
-              // Main Content
+              // Main Content - Make it scrollable
               Expanded(
                 child: Container(
                   margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -119,7 +135,10 @@ class _ProductsScreenState extends State<ProductsScreen>
                       ),
                     ],
                   ),
-                  child: _buildGroupedProductionsTab(),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: _buildGroupedProductionsTab(),
+                  ),
                 ),
               ),
             ],
@@ -130,6 +149,7 @@ class _ProductsScreenState extends State<ProductsScreen>
     );
   }
 
+  // Update the _buildGroupedProductionsTab method
   Widget _buildGroupedProductionsTab() {
     return Consumer<ProductionViewModel>(
       builder: (context, viewModel, _) {
@@ -139,13 +159,20 @@ class _ProductsScreenState extends State<ProductsScreen>
 
         final groupedProductions = _groupProductions(viewModel.productions);
 
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: groupedProductions.length,
-          itemBuilder: (context, index) {
-            final group = groupedProductions[index];
-            return _buildGroupedProductionCard(group);
+        return RefreshIndicator(
+          onRefresh: () async {
+            await viewModel.loadProductions();
+            await context.read<InventoryViewModel>().loadInventory();
           },
+          child: ListView.builder(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            itemCount: groupedProductions.length,
+            itemBuilder: (context, index) {
+              final group = groupedProductions[index];
+              return _buildGroupedProductionCard(group);
+            },
+          ),
         );
       },
     );

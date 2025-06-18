@@ -1,10 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:visionapp/models/orders.dart';
+import 'package:visionapp/view/auth/login_screen.dart';
 import 'package:visionapp/view/sales/order_placement_screen.dart';
 import 'package:visionapp/viewmodels/client_viewmodel.dart';
 import 'package:visionapp/viewmodels/orders_viewmodel.dart';
 import 'package:visionapp/viewmodels/products_viewmodel.dart';
+
+class ResponsiveHelper {
+  static bool isMobile(BuildContext context) =>
+      MediaQuery.of(context).size.width < 650;
+
+  static bool isTablet(BuildContext context) =>
+      MediaQuery.of(context).size.width < 1100 &&
+      MediaQuery.of(context).size.width >= 650;
+
+  static bool isDesktop(BuildContext context) =>
+      MediaQuery.of(context).size.width >= 1100;
+
+  static double getScreenWidth(BuildContext context) =>
+      MediaQuery.of(context).size.width;
+}
 
 class SalesDashboardScreen extends StatefulWidget {
   const SalesDashboardScreen({Key? key}) : super(key: key);
@@ -32,16 +49,49 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
     ]);
   }
 
+  void _handleLogout() async {
+    bool confirm = await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Confirm Logout'),
+          content: const Text('Are you sure you want to logout?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Logout'),
+            ),
+          ],
+        );
+      },
+    ) ?? false;
+
+    if (confirm && mounted) {
+      await Supabase.instance.client.auth.signOut();
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+        (route) => false,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isMobile = ResponsiveHelper.isMobile(context);
+    final isTablet = ResponsiveHelper.isTablet(context);
+    
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Sales Dashboard',
           style: TextStyle(
             fontWeight: FontWeight.w700,
-            fontSize: 20,
+            fontSize: isMobile ? 18 : 20,
             letterSpacing: -0.3,
           ),
         ),
@@ -49,6 +99,13 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
         foregroundColor: const Color(0xFF059669),
         elevation: 0,
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: _handleLogout,
+            tooltip: 'Logout',
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Container(
@@ -81,14 +138,17 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
                       size: 64,
                     ),
                     const SizedBox(height: 16),
-                    Text(
-                      'Error: ${ordersViewModel.error ?? clientViewModel.error}',
-                      style: const TextStyle(
-                        color: Color(0xFFEF4444),
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Text(
+                        'Error: ${ordersViewModel.error ?? clientViewModel.error}',
+                        style: const TextStyle(
+                          color: Color(0xFFEF4444),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
-                      textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton(
@@ -106,17 +166,17 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
 
             return SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.all(isMobile ? 16 : 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Stats Grid
                   _buildStatsGrid(ordersViewModel, clientViewModel),
-                  const SizedBox(height: 24),
+                  SizedBox(height: isMobile ? 20 : 24),
                   
                   // Sales Performance Chart
                   _buildSalesChart(),
-                  const SizedBox(height: 24),
+                  SizedBox(height: isMobile ? 20 : 24),
                   
                   // Recent Orders Section
                   _buildRecentOrdersSection(ordersViewModel),
@@ -136,15 +196,17 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
           );
         },
         backgroundColor: const Color(0xFF059669),
-        icon: const Icon(
+        icon: Icon(
           Icons.add_shopping_cart,
           color: Colors.white,
+          size: isMobile ? 20 : 24,
         ),
-        label: const Text(
+        label: Text(
           'New Order',
           style: TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.w600,
+            fontSize: isMobile ? 14 : 16,
           ),
         ),
       ),
@@ -153,43 +215,64 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
   }
 
   Widget _buildStatsGrid(OrdersViewModel ordersViewModel, ClientViewModel clientViewModel) {
+    final isMobile = ResponsiveHelper.isMobile(context);
+    final isTablet = ResponsiveHelper.isTablet(context);
+    final isDesktop = ResponsiveHelper.isDesktop(context);
+    
     // Calculate total revenue (mock calculation)
     final totalRevenue = ordersViewModel.orders
         .where((order) => order.status == OrderStatus.completed)
-        .fold(0.0, (sum, order) => sum + (order.totalUnits * 500.0)); // Assuming ₹500 per unit
+        .fold(0.0, (sum, order) => sum + (order.totalUnits * 500.0));
+
+    // Determine grid layout based on screen size
+    int crossAxisCount;
+    double childAspectRatio;
+    
+    if (isMobile) {
+      crossAxisCount = 2;
+      childAspectRatio = 1.8; // More compact on mobile
+    } else if (isTablet) {
+      crossAxisCount = 2;
+      childAspectRatio = 2.2;
+    } else {
+      crossAxisCount = 4;
+      childAspectRatio = 1.6;
+    }
 
     return GridView.count(
-      crossAxisCount: 2,
+      crossAxisCount: crossAxisCount,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 1.5,
-      crossAxisSpacing: 16,
-      mainAxisSpacing: 16,
+      childAspectRatio: childAspectRatio,
+      crossAxisSpacing: isMobile ? 12 : 16,
+      mainAxisSpacing: isMobile ? 12 : 16,
       children: [
-        // _buildStatCard(
-        //   title: 'This Month',
-        //   value: '₹${(totalRevenue / 100000).toStringAsFixed(1)}L',
-        //   icon: Icons.trending_up,
-        //   color: const Color(0xFF059669),
-        // ),
         _buildStatCard(
           title: 'Active Orders',
           value: '${ordersViewModel.activeOrdersCount}',
           icon: Icons.receipt_long,
           color: const Color(0xFF059669),
         ),
-        // _buildStatCard(
-        //   title: 'Total Clients',
-        //   value: '${clientViewModel.clients.length}',
-        //   icon: Icons.people,
-        //   color: const Color(0xFF059669),
-        // ),
         _buildStatCard(
           title: 'Units in Queue',
           value: '${ordersViewModel.totalUnitsInQueue}',
           icon: Icons.inventory,
-          color: const Color(0xFF059669),
+          color: const Color(0xFF0EA5E9),
         ),
+        if (!isMobile || isDesktop) ...[
+          _buildStatCard(
+            title: 'Total Clients',
+            value: '${clientViewModel.clients.length}',
+            icon: Icons.people,
+            color: const Color(0xFF8B5CF6),
+          ),
+          _buildStatCard(
+            title: 'This Month',
+            value: '₹${(totalRevenue / 100000).toStringAsFixed(1)}L',
+            icon: Icons.trending_up,
+            color: const Color(0xFFEF4444),
+          ),
+        ],
       ],
     );
   }
@@ -200,6 +283,8 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
     required IconData icon,
     required Color color,
   }) {
+    final isMobile = ResponsiveHelper.isMobile(context);
+    
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -210,42 +295,49 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
             color.withOpacity(0.8),
           ],
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
         boxShadow: [
           BoxShadow(
             color: color.withOpacity(0.2),
-            blurRadius: 12,
-            offset: const Offset(0, 8),
+            blurRadius: isMobile ? 8 : 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(isMobile ? 12 : 16),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
             icon,
             color: Colors.white,
-            size: 28,
+            size: isMobile ? 20 : 24,
           ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.5,
+          SizedBox(height: isMobile ? 4 : 6),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              value,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: isMobile ? 18 : 20,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.5,
+              ),
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            title.toUpperCase(),
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.9),
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.5,
+          SizedBox(height: isMobile ? 2 : 4),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              title.toUpperCase(),
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.9),
+                fontSize: isMobile ? 9 : 10,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.5,
+              ),
+              textAlign: TextAlign.center,
             ),
           ),
         ],
@@ -254,8 +346,10 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
   }
 
   Widget _buildSalesChart() {
+    final isMobile = ResponsiveHelper.isMobile(context);
+    
     return Container(
-      height: 140,
+      height: isMobile ? 120 : 140,
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
@@ -265,52 +359,52 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
             Color(0xFF10B981),
           ],
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF059669).withOpacity(0.2),
-            blurRadius: 12,
-            offset: const Offset(0, 8),
+            blurRadius: isMobile ? 8 : 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Stack(
         children: [
-          const Positioned(
-            top: 20,
-            left: 20,
+          Positioned(
+            top: isMobile ? 16 : 20,
+            left: isMobile ? 16 : 20,
             child: Text(
               '2025 Sales Performance',
               style: TextStyle(
                 color: Colors.white,
-                fontSize: 14,
+                fontSize: isMobile ? 12 : 14,
                 fontWeight: FontWeight.w700,
               ),
             ),
           ),
-          const Positioned(
-            top: 40,
-            left: 20,
+          Positioned(
+            top: isMobile ? 32 : 40,
+            left: isMobile ? 16 : 20,
             child: Text(
               '₹12.8M',
               style: TextStyle(
                 color: Colors.white,
-                fontSize: 28,
+                fontSize: isMobile ? 24 : 28,
                 fontWeight: FontWeight.w800,
               ),
             ),
           ),
           Positioned(
-            bottom: 20,
-            left: 20,
-            right: 20,
+            bottom: isMobile ? 16 : 20,
+            left: isMobile ? 16 : 20,
+            right: isMobile ? 16 : 20,
             child: Row(
               children: List.generate(12, (index) {
                 final heights = [45, 60, 30, 80, 55, 90, 70, 85, 75, 95, 65, 100];
                 return Expanded(
                   child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 2),
-                    height: (heights[index] / 100) * 60,
+                    margin: const EdgeInsets.symmetric(horizontal: 1),
+                    height: (heights[index] / 100) * (isMobile ? 40 : 50),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.3),
                       borderRadius: const BorderRadius.vertical(top: Radius.circular(2)),
@@ -327,6 +421,7 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
 
   Widget _buildRecentOrdersSection(OrdersViewModel ordersViewModel) {
     final recentOrders = ordersViewModel.recentOrders;
+    final isMobile = ResponsiveHelper.isMobile(context);
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -334,48 +429,51 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'Recent Orders',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF1F2937),
-                letterSpacing: -0.3,
+            Expanded(
+              child: Text(
+                'Recent Orders',
+                style: TextStyle(
+                  fontSize: isMobile ? 16 : 18,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF1F2937),
+                  letterSpacing: -0.3,
+                ),
               ),
             ),
-            Text(
-              'Sales: ${_getCurrentSalesPersonName()}',
-              style: const TextStyle(
-                fontSize: 12,
-                color: Color(0xFF6B7280),
-                fontWeight: FontWeight.w600,
+            if (!isMobile)
+              Text(
+                'Sales: ${_getCurrentSalesPersonName()}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF6B7280),
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
           ],
         ),
         const SizedBox(height: 16),
         if (recentOrders.isEmpty)
           Container(
-            padding: const EdgeInsets.all(24),
+            padding: EdgeInsets.all(isMobile ? 20 : 24),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
               border: Border.all(color: const Color(0xFFE5E7EB)),
             ),
-            child: const Center(
+            child: Center(
               child: Column(
                 children: [
                   Icon(
                     Icons.inbox_outlined,
-                    size: 48,
+                    size: isMobile ? 40 : 48,
                     color: Color(0xFF9CA3AF),
                   ),
-                  SizedBox(height: 8),
+                  SizedBox(height: isMobile ? 6 : 8),
                   Text(
                     'No recent orders',
                     style: TextStyle(
                       color: Color(0xFF6B7280),
-                      fontSize: 16,
+                      fontSize: isMobile ? 14 : 16,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -398,7 +496,7 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
   }
 
   Widget _buildOrderCard(Order order) {
-    // Group products by ID and sum their quantities
+    final isMobile = ResponsiveHelper.isMobile(context);
     final Map<String, int> groupedProducts = {};
     
     return Consumer<ProductsViewModel>(
@@ -410,15 +508,15 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
         }
 
         return Container(
-          margin: const EdgeInsets.only(bottom: 12),
+          margin: EdgeInsets.only(bottom: isMobile ? 8 : 12),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE5E7EB), width: 2),
+            borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
+            border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
             boxShadow: [
               BoxShadow(
                 color: const Color(0xFF1E40AF).withOpacity(0.04),
-                blurRadius: 8,
+                blurRadius: 6,
                 offset: const Offset(0, 2),
               ),
             ],
@@ -436,13 +534,13 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
                     decoration: BoxDecoration(
                       border: Border(
                         top: BorderSide(
-                          width: 30,
+                          width: isMobile ? 20 : 25,
                           color: order.priority == Priority.urgent 
                               ? const Color(0xFFDC2626) 
                               : const Color(0xFFEF4444),
                         ),
-                        right: const BorderSide(
-                          width: 30,
+                        right: BorderSide(
+                          width: isMobile ? 20 : 25,
                           color: Colors.transparent,
                         ),
                       ),
@@ -451,7 +549,7 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
                 ),
               
               Padding(
-                padding: const EdgeInsets.all(18),
+                padding: EdgeInsets.all(isMobile ? 14 : 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -465,18 +563,18 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
                             children: [
                               Text(
                                 '${order.clientName} - Order #${order.displayId}',
-                                style: const TextStyle(
-                                  fontSize: 16,
+                                style: TextStyle(
+                                  fontSize: isMobile ? 14 : 16,
                                   fontWeight: FontWeight.w700,
                                   color: Color(0xFF111827),
                                   letterSpacing: -0.2,
                                 ),
                               ),
-                              const SizedBox(height: 4),
+                              SizedBox(height: isMobile ? 3 : 4),
                               Text(
                                 'Due: ${_formatDate(order.dueDate)}',
-                                style: const TextStyle(
-                                  fontSize: 14,
+                                style: TextStyle(
+                                  fontSize: isMobile ? 12 : 14,
                                   color: Color(0xFF6B7280),
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -486,23 +584,23 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: isMobile ? 8 : 10),
                     
-                    // Updated products display
+                    // Products display
                     Text(
                       groupedProducts.entries
                           .map((e) => '${e.key} (${e.value})')
                           .join(' • '),
                       style: TextStyle(
                         color: const Color(0xFF6B7280),
-                        fontSize: MediaQuery.of(context).size.width < 600 ? 12 : 14,
+                        fontSize: isMobile ? 11 : 13,
                         fontWeight: FontWeight.w500,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                     
-                    const SizedBox(height: 12),
+                    SizedBox(height: isMobile ? 8 : 10),
                     _buildStatusBadge(order.status),
                   ],
                 ),
@@ -515,6 +613,7 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
   }
 
   Widget _buildStatusBadge(OrderStatus status) {
+    final isMobile = ResponsiveHelper.isMobile(context);
     Color backgroundColor;
     String text;
 
@@ -539,17 +638,17 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
 
     return Container(
       padding: EdgeInsets.symmetric(
-        horizontal: MediaQuery.of(context).size.width < 600 ? 10 : 14,
-        vertical: MediaQuery.of(context).size.width < 600 ? 6 : 8
+        horizontal: isMobile ? 8 : 12,
+        vertical: isMobile ? 4 : 6,
       ),
       decoration: BoxDecoration(
         color: backgroundColor,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
             color: backgroundColor.withOpacity(0.3),
-            blurRadius: 4,
-            offset: const Offset(0, 4),
+            blurRadius: 3,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -557,9 +656,9 @@ class _SalesDashboardScreenState extends State<SalesDashboardScreen> {
         text,
         style: TextStyle(
           color: Colors.white,
-          fontSize: MediaQuery.of(context).size.width < 600 ? 10 : 11,
+          fontSize: isMobile ? 9 : 10,
           fontWeight: FontWeight.bold,
-          letterSpacing: 0.8,
+          letterSpacing: 0.5,
         ),
       ),
     );

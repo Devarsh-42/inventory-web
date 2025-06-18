@@ -22,25 +22,24 @@ class InventoryRepository {
     }
   }
 
-  Future<void> consumeInventory(String inventoryId, int amount) async {
-    try {
-      await _supabaseService.client
-          .from(_tableName)
-          .update({'available_qty': 'available_qty - $amount'})
-          .eq('id', inventoryId)
-          .gte('available_qty', amount);
-    } catch (e) {
-      throw Exception('Failed to consume inventory: $e');
-    }
-  }
+Future<void> consumeInventory(String inventoryId, int amount) async {
+  final inv = await getInventoryById(inventoryId);
+  final newAvailable = inv.availableQty - amount;
+  if (newAvailable < 0) throw Exception('Not enough stock');
+  await _supabaseService.client
+      .from(_tableName)
+      .update({'available_qty': newAvailable})
+      .eq('id', inventoryId);
+}
 
   Future<Inventory> getInventoryById(String id) async {
     try {
-      final response = await _supabaseService.client
-          .from(_tableName)
-          .select()
-          .eq('id', id)
-          .single();
+      final response =
+          await _supabaseService.client
+              .from(_tableName)
+              .select()
+              .eq('id', id)
+              .single();
 
       return Inventory.fromJson(response);
     } catch (e) {

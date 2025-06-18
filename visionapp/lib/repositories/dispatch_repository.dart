@@ -42,9 +42,7 @@ class DispatchRepository {
     try {
       await _supabaseService.client.rpc(
         'mark_dispatch_item_ready',
-        params: {
-          'p_item_id': itemId,
-        },
+        params: {'p_item_id': itemId},
       );
     } catch (e) {
       throw Exception('Failed to mark item as ready: $e');

@@ -19,6 +19,9 @@ class DispatchScreen extends StatefulWidget {
 class _DispatchScreenState extends State<DispatchScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  
+  // Purple theme color
+  static const Color primaryPurple = Color(0xFF9349FC);
 
   @override
   void initState() {
@@ -41,84 +44,87 @@ class _DispatchScreenState extends State<DispatchScreen> {
 
     final result = await showDialog<String>(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.blue[50],
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Icon(
-                    Icons.inventory_2,
-                    color: Colors.blue[600],
-                    size: 18,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                const Text('Add Batch Details', style: TextStyle(fontSize: 16)),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${item.productName} - ${NumberFormatter.formatQuantity(item.quantity)} units',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: batchDetailsController,
-                  maxLines: 3,
-                  decoration: InputDecoration(
-                    hintText: 'Enter batch details...',
-                    hintStyle: const TextStyle(fontSize: 13),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    contentPadding: const EdgeInsets.all(12),
-                  ),
-                  style: const TextStyle(fontSize: 13),
-                  autofocus: true,
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel', style: TextStyle(fontSize: 13)),
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: primaryPurple.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(6),
               ),
-              ElevatedButton.icon(
-                onPressed: () {
-                  final details = batchDetailsController.text.trim();
-                  if (details.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Please enter batch details',
-                          style: TextStyle(fontSize: 13),
-                        ),
-                      ),
-                    );
-                    return;
-                  }
-                  Navigator.pop(context, details);
-                },
-                icon: const Icon(Icons.check, size: 16),
-                label: const Text('Mark Ready', style: TextStyle(fontSize: 13)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green[600],
-                  foregroundColor: Colors.white,
-                ),
+              child: Icon(
+                Icons.inventory_2,
+                color: primaryPurple,
+                size: 18,
               ),
-            ],
+            ),
+            const SizedBox(width: 10),
+            const Text('Add Batch Details', style: TextStyle(fontSize: 16)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${item.productName} - ${NumberFormatter.formatQuantity(item.quantity)} units',
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: batchDetailsController,
+              maxLines: 3,
+              decoration: InputDecoration(
+                hintText: 'Enter batch details...',
+                hintStyle: const TextStyle(fontSize: 13),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: primaryPurple),
+                ),
+                contentPadding: const EdgeInsets.all(12),
+              ),
+              style: const TextStyle(fontSize: 13),
+              autofocus: true,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(fontSize: 13)),
           ),
+          ElevatedButton.icon(
+            onPressed: () {
+              final details = batchDetailsController.text.trim();
+              if (details.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Please enter batch details',
+                      style: TextStyle(fontSize: 13),
+                    ),
+                  ),
+                );
+                return;
+              }
+              Navigator.pop(context, details);
+            },
+            icon: const Icon(Icons.check, size: 16),
+            label: const Text('Mark Ready', style: TextStyle(fontSize: 13)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryPurple,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
     );
 
     if (result != null) {
@@ -127,7 +133,7 @@ class _DispatchScreenState extends State<DispatchScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('${item.productName} marked as ready'),
-            backgroundColor: Colors.green,
+            backgroundColor: primaryPurple,
           ),
         );
       } catch (e) {
@@ -160,174 +166,99 @@ class _DispatchScreenState extends State<DispatchScreen> {
     }
 
     final availableQty = inventoryStatus.availableQty;
-    final canMarkReady =
-        availableQty >= item.quantity && !item.ready && !item.shipped;
+    final canMarkReady = availableQty >= item.quantity && !item.ready && !item.shipped;
 
     return Card(
-      margin: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 8, vertical: 2),
-      elevation: item.ready ? 2 : 1,
-      color: item.ready ? Colors.green[50] : null,
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Padding(
-        padding: EdgeInsets.all(isMobile ? 12 : 16),
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // Product name and status row
             Row(
               children: [
                 Expanded(
                   child: Text(
                     item.productName,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontWeight: FontWeight.w600,
-                      fontSize: isMobile ? 14 : 16,
+                      fontSize: 14,
                     ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 Icon(
-                  item.ready
-                      ? Icons.check_circle
-                      : Icons.radio_button_unchecked,
-                  color: item.ready ? Colors.green : Colors.grey,
-                  size: isMobile ? 20 : 24,
+                  item.ready ? Icons.check_circle : Icons.radio_button_unchecked,
+                  color: item.ready ? primaryPurple : Colors.grey,
+                  size: 20,
                 ),
               ],
             ),
-
             const SizedBox(height: 8),
-
-            // Quantity information
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Required: ${NumberFormatter.formatQuantity(item.quantity)}',
-                        style: TextStyle(
-                          fontSize: isMobile ? 12 : 14,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                      Text(
-                        'Available: ${NumberFormatter.formatQuantity(availableQty)}',
-                        style: TextStyle(
-                          fontSize: isMobile ? 11 : 12,
-                          color:
-                              availableQty >= item.quantity
-                                  ? Colors.green[600]
-                                  : Colors.red[600],
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
+                Text(
+                  'Required: ${NumberFormatter.formatQuantity(item.quantity)}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[700],
+                  ),
+                ),
+                Text(
+                  'Available: ${NumberFormatter.formatQuantity(availableQty)}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: availableQty >= item.quantity
+                        ? primaryPurple
+                        : Colors.red[600],
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
             ),
-
-            const SizedBox(height: 12),
-
-            // Action buttons
-            Row(
-              children: [
-                if (canMarkReady) ...[
-                  ElevatedButton.icon(
-                    onPressed: () => _markItemReady(item),
-                    icon: const Icon(Icons.check, size: 16),
-                    label: const Text('Mark Ready'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange[600],
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isMobile ? 8 : 12,
-                        vertical: isMobile ? 6 : 8,
-                      ),
-                    ),
-                  ),
-                ] else if (item.ready && !item.shipped) ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.green[100],
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Text(
-                      'READY FOR DISPATCH',
-                      style: TextStyle(
-                        color: Colors.green[700],
-                        fontWeight: FontWeight.w600,
-                        fontSize: isMobile ? 10 : 11,
-                      ),
-                    ),
-                  ),
-                ] else if (item.shipped) ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.blue[100],
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.local_shipping,
-                          size: 16,
-                          color: Colors.blue[700],
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'SHIPPED',
-                          style: TextStyle(
-                            color: Colors.blue[700],
-                            fontWeight: FontWeight.w600,
-                            fontSize: isMobile ? 10 : 11,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
-            ),
-
-            // Show insufficient inventory warning if needed
-            if (!item.ready && availableQty < item.quantity) ...[
+            if (canMarkReady || item.ready) ...[
               const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.orange[50],
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: Colors.orange[200]!),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.warning_amber,
-                      size: 16,
-                      color: Colors.orange[600],
-                    ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        'Insufficient inventory (need ${item.quantity - availableQty} more)',
-                        style: TextStyle(
-                          fontSize: isMobile ? 10 : 11,
-                          color: Colors.orange[700],
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (canMarkReady)
+                    ElevatedButton.icon(
+                      onPressed: () => _markItemReady(item),
+                      icon: const Icon(Icons.check, size: 16),
+                      label: const Text('Mark Ready', style: TextStyle(fontSize: 12)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryPurple,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
                         ),
                       ),
                     ),
-                  ],
-                ),
+                  if (item.ready && !item.shipped)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: primaryPurple.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Text(
+                        'READY FOR DISPATCH',
+                        style: TextStyle(
+                          color: primaryPurple,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ],
           ],
@@ -342,108 +273,111 @@ class _DispatchScreenState extends State<DispatchScreen> {
 
     final result = await showDialog<String>(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.green[50],
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Icon(
-                    Icons.local_shipping,
-                    color: Colors.green[600],
-                    size: 18,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                const Text('Shipment Details', style: TextStyle(fontSize: 16)),
-              ],
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: primaryPurple.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Icon(
+                Icons.local_shipping,
+                color: primaryPurple,
+                size: 18,
+              ),
             ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[50],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey[200]!),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Items to ship:',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      ...dispatch.items.map(
-                        (item) => Padding(
-                          padding: const EdgeInsets.only(bottom: 2),
-                          child: Text(
-                            '• ${item.productName} (${NumberFormatter.formatQuantity(item.quantity)})',
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: shipmentDetailsController,
-                  maxLines: 4,
-                  decoration: InputDecoration(
-                    hintText: 'Enter shipment details...',
-                    hintStyle: const TextStyle(fontSize: 13),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
+            const SizedBox(width: 10),
+            const Text('Shipment Details', style: TextStyle(fontSize: 16)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[200]!),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Items to ship:',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey[700],
                     ),
-                    contentPadding: const EdgeInsets.all(12),
                   ),
-                  style: const TextStyle(fontSize: 13),
-                  autofocus: true,
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel', style: TextStyle(fontSize: 13)),
-              ),
-              ElevatedButton.icon(
-                onPressed: () {
-                  final details = shipmentDetailsController.text.trim();
-                  if (details.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Please enter shipment details',
-                          style: TextStyle(fontSize: 13),
-                        ),
+                  const SizedBox(height: 6),
+                  ...dispatch.items.map(
+                    (item) => Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: Text(
+                        '• ${item.productName} (${NumberFormatter.formatQuantity(item.quantity)})',
+                        style: const TextStyle(fontSize: 12),
                       ),
-                    );
-                    return;
-                  }
-                  Navigator.pop(context, details);
-                },
-                icon: const Icon(Icons.send, size: 16),
-                label: const Text('Ship', style: TextStyle(fontSize: 13)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green[600],
-                  foregroundColor: Colors.white,
-                ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: shipmentDetailsController,
+              maxLines: 4,
+              decoration: InputDecoration(
+                hintText: 'Enter shipment details...',
+                hintStyle: const TextStyle(fontSize: 13),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: primaryPurple),
+                ),
+                contentPadding: const EdgeInsets.all(12),
+              ),
+              style: const TextStyle(fontSize: 13),
+              autofocus: true,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(fontSize: 13)),
           ),
+          ElevatedButton.icon(
+            onPressed: () {
+              final details = shipmentDetailsController.text.trim();
+              if (details.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Please enter shipment details',
+                      style: TextStyle(fontSize: 13),
+                    ),
+                  ),
+                );
+                return;
+              }
+              Navigator.pop(context, details);
+            },
+            icon: const Icon(Icons.send, size: 16),
+            label: const Text('Ship', style: TextStyle(fontSize: 13)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryPurple,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
     );
 
     if (result != null) {
@@ -465,7 +399,7 @@ class _DispatchScreenState extends State<DispatchScreen> {
         children: [
           Container(
             decoration: BoxDecoration(
-              color: isShipped ? Colors.green[50] : null,
+              color: isShipped ? primaryPurple.withOpacity(0.1) : null,
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(4),
                 topRight: Radius.circular(4),
@@ -495,7 +429,7 @@ class _DispatchScreenState extends State<DispatchScreen> {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.green,
+                        color: primaryPurple,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
@@ -540,7 +474,7 @@ class _DispatchScreenState extends State<DispatchScreen> {
                         style: TextStyle(fontSize: isMobile ? 11 : 12),
                       ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green[600],
+                        backgroundColor: primaryPurple,
                         foregroundColor: Colors.white,
                         padding: EdgeInsets.symmetric(
                           horizontal: isMobile ? 8 : 12,
@@ -558,8 +492,7 @@ class _DispatchScreenState extends State<DispatchScreen> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: dispatch.items.length,
-            itemBuilder:
-                (context, index) => _buildDispatchItem(dispatch.items[index]),
+            itemBuilder: (context, index) => _buildDispatchItem(dispatch.items[index]),
           ),
         ],
       ),
@@ -576,6 +509,8 @@ class _DispatchScreenState extends State<DispatchScreen> {
           'Dispatch Management',
           style: TextStyle(fontSize: isMobile ? 16 : 18),
         ),
+        backgroundColor: primaryPurple,
+        foregroundColor: Colors.white,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh, size: 20),
@@ -590,7 +525,11 @@ class _DispatchScreenState extends State<DispatchScreen> {
       body: Consumer<DispatchViewModel>(
         builder: (context, viewModel, child) {
           if (viewModel.isLoading) {
-            return const Center(child: CircularProgressIndicator());
+            return Center(
+              child: CircularProgressIndicator(
+                color: primaryPurple,
+              ),
+            );
           }
 
           if (viewModel.error != null) {
@@ -613,124 +552,102 @@ class _DispatchScreenState extends State<DispatchScreen> {
                     },
                     icon: const Icon(Icons.refresh, size: 16),
                     label: const Text('Retry', style: TextStyle(fontSize: 13)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryPurple,
+                      foregroundColor: Colors.white,
+                    ),
                   ),
                 ],
               ),
             );
           }
 
-          final dispatches =
-              viewModel.groupedDispatchItems
-                  .where(
-                    (dispatch) =>
-                        _searchQuery.isEmpty ||
-                        dispatch.clientName.toLowerCase().contains(
-                          _searchQuery.toLowerCase(),
-                        ) ||
-                        dispatch.items.any(
-                          (item) => item.productName.toLowerCase().contains(
-                            _searchQuery.toLowerCase(),
-                          ),
-                        ),
-                  )
-                  .toList();
+          final dispatches = viewModel.groupedDispatchItems
+              .where(
+                (dispatch) =>
+                    _searchQuery.isEmpty ||
+                    dispatch.clientName.toLowerCase().contains(
+                      _searchQuery.toLowerCase(),
+                    ) ||
+                    dispatch.items.any(
+                      (item) => item.productName.toLowerCase().contains(
+                        _searchQuery.toLowerCase(),
+                      ),
+                    ),
+              )
+              .toList();
 
           return Column(
             children: [
-              // Inventory Status Widget
+              // Inventory Status Section
               Container(
-                height: ResponsiveHelper.isMobile(context) ? 80 : 100,
-                padding: EdgeInsets.symmetric(
-                  horizontal: ResponsiveHelper.isMobile(context) ? 12 : 16,
-                  vertical: ResponsiveHelper.isMobile(context) ? 8 : 12,
-                ),
+                height: 140, // Increased height to prevent overflow
                 child: Consumer<InventoryViewModel>(
                   builder: (context, inventoryViewModel, _) {
                     if (inventoryViewModel.isLoading) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-
-                    if (inventoryViewModel.error != null) {
-                      return Center(child: Text(inventoryViewModel.error!));
-                    }
-
-                    if (inventoryViewModel.inventory.isEmpty) {
-                      return const Center(
-                        child: Text('No inventory items available'),
+                      return Center(
+                        child: CircularProgressIndicator(
+                          color: primaryPurple,
+                        ),
                       );
                     }
 
                     return ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                       itemCount: inventoryViewModel.inventory.length,
                       itemBuilder: (context, index) {
                         final inventory = inventoryViewModel.inventory[index];
-                        return InventoryStatusWidget(inventory: inventory);
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: SizedBox(
+                            width: 280,
+                            child: InventoryStatusWidget(inventory: inventory),
+                          ),
+                        );
                       },
                     );
                   },
                 ),
               ),
 
-              SizedBox(height: ResponsiveHelper.isMobile(context) ? 12 : 20),
-
               // Search Bar
               Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: ResponsiveHelper.isMobile(context) ? 12 : 16,
-                  vertical: ResponsiveHelper.isMobile(context) ? 8 : 12,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
                 ),
                 child: TextField(
                   controller: _searchController,
-                  style: TextStyle(
-                    fontSize: ResponsiveHelper.isMobile(context) ? 13 : 14,
-                  ),
+                  style: const TextStyle(fontSize: 13),
                   decoration: InputDecoration(
                     hintText: 'Search by client or product...',
-                    hintStyle: TextStyle(
-                      fontSize: ResponsiveHelper.isMobile(context) ? 13 : 14,
+                    hintStyle: const TextStyle(fontSize: 13),
+                    prefixIcon: Icon(Icons.search, size: 18, color: primaryPurple),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 18),
+                            padding: EdgeInsets.zero,
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = '');
+                            },
+                          )
+                        : null,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
                     ),
-                    prefixIcon: Icon(
-                      Icons.search,
-                      size: ResponsiveHelper.isMobile(context) ? 18 : 20,
-                    ),
-                    suffixIcon:
-                        _searchQuery.isNotEmpty
-                            ? IconButton(
-                              icon: Icon(
-                                Icons.clear,
-                                size:
-                                    ResponsiveHelper.isMobile(context)
-                                        ? 18
-                                        : 20,
-                              ),
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() => _searchQuery = '');
-                              },
-                            )
-                            : null,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: Colors.grey[300]!),
-                    ),
-                    enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                       borderSide: BorderSide(color: Colors.grey[300]!),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(
-                        color: Color(0xFF1E40AF),
-                        width: 2,
-                      ),
-                    ),
-                    filled: true,
-                    fillColor: Colors.white,
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: ResponsiveHelper.isMobile(context) ? 12 : 16,
-                      vertical: ResponsiveHelper.isMobile(context) ? 10 : 12,
+                      borderSide: BorderSide(color: primaryPurple),
                     ),
                   ),
                   onChanged: (value) => setState(() => _searchQuery = value),
@@ -739,30 +656,21 @@ class _DispatchScreenState extends State<DispatchScreen> {
 
               // Dispatch List
               Expanded(
-                child:
-                    dispatches.isEmpty
-                        ? Center(
-                          child: Text(
-                            _searchQuery.isEmpty
-                                ? 'No items to dispatch'
-                                : 'No results found for "$_searchQuery"',
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize:
-                                  ResponsiveHelper.isMobile(context) ? 13 : 14,
-                            ),
-                          ),
-                        )
-                        : ListView.builder(
-                          padding: EdgeInsets.only(
-                            bottom:
-                                ResponsiveHelper.isMobile(context) ? 80 : 100,
-                          ),
-                          itemCount: dispatches.length,
-                          itemBuilder:
-                              (context, index) =>
-                                  _buildDispatchGroup(dispatches[index]),
+                child: dispatches.isEmpty
+                    ? Center(
+                        child: Text(
+                          _searchQuery.isEmpty
+                              ? 'No items to dispatch'
+                              : 'No results found for "$_searchQuery"',
+                          style: const TextStyle(fontSize: 13),
                         ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.only(bottom: 80),
+                        itemCount: dispatches.length,
+                        itemBuilder: (context, index) =>
+                            _buildDispatchGroup(dispatches[index]),
+                      ),
               ),
             ],
           );

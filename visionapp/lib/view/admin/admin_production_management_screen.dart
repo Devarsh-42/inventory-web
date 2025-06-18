@@ -124,13 +124,6 @@ class _AdminProductionManagementScreenState
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // Show dialog to create new production
-        },
-        child: const Icon(Icons.add),
-        backgroundColor: Palette.primaryBlue,
-      ),
       bottomNavigationBar: AdminBottomNav(
         selectedIndex: _selectedIndex,
         onItemTapped:
@@ -146,28 +139,15 @@ class _AdminProductionManagementScreenState
           return const Center(child: CircularProgressIndicator());
         }
 
-        return FutureBuilder<List<GroupedProductionView>>(
-          future: _groupProductions(viewModel.productions),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
+        final groupedProductions = _groupProductions(viewModel.productions);
 
-            if (snapshot.hasError) {
-              return Center(child: Text('Error: ${snapshot.error}'));
-            }
-
-            final groupedProductions = snapshot.data!;
-            return ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(16),
-              itemCount: groupedProductions.length,
-              itemBuilder: (context, index) {
-                final group = groupedProductions[index];
-                return _buildGroupedProductionCard(group);
-              },
-            );
+        return ListView.builder(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16),
+          itemCount: groupedProductions.length,
+          itemBuilder: (context, index) {
+            final group = groupedProductions[index];
+            return _buildGroupedProductionCard(group);
           },
         );
       },
@@ -667,14 +647,8 @@ class _AdminProductionManagementScreenState
     }
   }
 
-  Future<List<GroupedProductionView>> _groupProductions(
-    List<Production> productions,
-  ) async {
+  List<GroupedProductionView> _groupProductions(List<Production> productions) {
     Map<String, GroupedProductionView> groups = {};
-    final ordersRepository = Provider.of<OrdersRepository>(
-      context,
-      listen: false,
-    );
 
     for (var prod in productions) {
       if (!groups.containsKey(prod.productName)) {
@@ -689,37 +663,29 @@ class _AdminProductionManagementScreenState
 
       groups[prod.productName]!.productions.add(prod);
       groups[prod.productName]!.totalTargetQuantity += prod.targetQuantity;
-      groups[prod.productName]!.totalCompletedQuantity +=
-          prod.completedQuantity;
+      groups[prod.productName]!.totalCompletedQuantity += prod.completedQuantity;
 
-      if (prod.orderId != null) {
+      if (prod.orderId != null && prod.orderDetails != null) {
         // Check if order is not already added
         final orderExists = groups[prod.productName]!.orders.any(
           (order) => order.orderId == prod.orderId,
         );
 
         if (!orderExists) {
-          try {
-            final orderDetails = await ordersRepository.getOrderById(
-              prod.orderId!,
-            );
-
-            groups[prod.productName]!.orders.add(
-              OrderSummary(
-                orderId: prod.orderId!,
-                displayId: orderDetails.displayId,
-                clientName: orderDetails.clientName,
-                quantity: prod.targetQuantity,
-                priority: orderDetails.priority.toString().split('.').last,
-                dueDate: orderDetails.dueDate,
-              ),
-            );
-          } catch (e) {
-            print('Error fetching order details for ID ${prod.orderId}: $e');
-          }
+          groups[prod.productName]!.orders.add(
+            OrderSummary(
+              orderId: prod.orderId!,
+              displayId: prod.orderDetails!['displayId'] ?? '',
+              clientName: prod.orderDetails!['clientName'] ?? 'Unknown Client',
+              quantity: prod.targetQuantity,
+              priority: prod.orderDetails!['priority'] ?? 'normal',
+              dueDate: prod.orderDetails!['dueDate'] ?? DateTime.now(),
+            ),
+          );
         }
       }
     }
+
     return groups.values.toList();
   }
 }

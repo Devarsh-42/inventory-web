@@ -17,9 +17,8 @@ class ProductionQueueRepository {
           .from(_tableName)
           .select('''
             *,
-            inventory:inventory_id (
+            inventory (
               id,
-              production_id,
               product_name,
               total_required_qty,
               available_qty,
@@ -42,10 +41,7 @@ class ProductionQueueRepository {
     try {
       await _supabaseService.client.rpc(
         'add_to_production_queue',
-        params: {
-          'p_inventory_id': inventoryId,
-          'p_quantity': quantity,
-        },
+        params: {'p_inventory_id': inventoryId, 'p_quantity': quantity},
       );
     } catch (e) {
       throw Exception('Failed to add to queue with priority: $e');
@@ -57,10 +53,7 @@ class ProductionQueueRepository {
     try {
       await _supabaseService.client.rpc(
         'add_to_production_queue',
-        params: {
-          'p_inventory_id': inventoryId,
-          'p_quantity': quantity,
-        },
+        params: {'p_inventory_id': inventoryId, 'p_quantity': quantity},
       );
     } catch (e) {
       throw Exception('Failed to add to queue: $e');
@@ -105,9 +98,7 @@ class ProductionQueueRepository {
     try {
       await _supabaseService.client.rpc(
         'reorder_production_queue',
-        params: {
-          'p_queue_ids': orderedIds,
-        },
+        params: {'p_queue_ids': orderedIds},
       );
     } catch (e) {
       print('Error details: ${e.toString()}'); // Add logging for debugging
@@ -134,7 +125,7 @@ class ProductionQueueRepository {
   Future<Map<String, InventoryStatusData>> getInventoryStatuses() async {
     try {
       final response = await _supabaseService.client
-          .from('inventory_status')
+          .from('inventory')
           .select()
           .order('product_name');
 
@@ -144,7 +135,8 @@ class ProductionQueueRepository {
           productName: item['product_name'],
           inventoryId: item['id'],
           totalRequiredQty: item['total_required_qty'], // Add default value
-          availableQty: item['available_qty'] ?? 0, // Map to available_qty field
+          availableQty:
+              item['available_qty'] ?? 0, // Map to available_qty field
         );
       }
       return result;

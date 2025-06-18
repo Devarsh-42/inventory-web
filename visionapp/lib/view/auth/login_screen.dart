@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:visionapp/core/utils/responsive_helper.dart';
 import 'package:visionapp/pallet.dart'; // Add this import
 import 'package:visionapp/view/admin/admin_dashboard.dart';
 import 'package:visionapp/view/management/dashboard.dart';
@@ -20,7 +19,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _companyIdController = TextEditingController();
   final _passwordController = TextEditingController();
-  String _selectedInterface = 'Management';
 
   @override
   void dispose() {
@@ -132,7 +130,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         SizedBox(height: isMobile ? 16 : 24),
                         Text(
-                          'Production',
+                          'Supply Chain',
                           style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
@@ -141,7 +139,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           textAlign: TextAlign.center,
                         ),
                         Text(
-                          'Management System',
+                          'Management System V1.0',
                           style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,

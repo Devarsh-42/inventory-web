@@ -15,7 +15,7 @@ class ProductionQueue {
     'queued',
     'in progress',
     'completed',
-    'paused'
+    'paused',
   ];
 
   ProductionQueue({
@@ -26,11 +26,10 @@ class ProductionQueue {
     this.progress = 0.0,
     DateTime? createdAt,
     DateTime? updatedAt,
-  }) : 
-    this.id = id ?? const Uuid().v4(),
-    this.status = status ?? 'queued',
-    this.createdAt = createdAt ?? DateTime.now(),
-    this.updatedAt = updatedAt ?? DateTime.now() {
+  }) : this.id = id ?? const Uuid().v4(),
+       this.status = status ?? 'queued',
+       this.createdAt = createdAt ?? DateTime.now(),
+       this.updatedAt = updatedAt ?? DateTime.now() {
     // Validate status
     if (!validStatuses.contains(this.status)) {
       throw ArgumentError('Invalid status: ${this.status}');
@@ -80,6 +79,7 @@ class ProductionQueue {
     }
   }
 }
+
 class ProductionQueueItem {
   final String id;
   final String inventoryId;
@@ -99,27 +99,20 @@ class ProductionQueueItem {
     this.inventory, // Add to constructor
     DateTime? createdAt,
     DateTime? updatedAt,
-  }) : 
-    this.id = id ?? const Uuid().v4(),
-    this.createdAt = createdAt ?? DateTime.now(),
-    this.updatedAt = updatedAt ?? DateTime.now();
+  }) : this.id = id ?? const Uuid().v4(),
+       this.createdAt = createdAt ?? DateTime.now(),
+       this.updatedAt = updatedAt ?? DateTime.now();
 
   factory ProductionQueueItem.fromJson(Map<String, dynamic> json) {
     return ProductionQueueItem(
-      id: json['id']?.toString() ?? const Uuid().v4(),
-      inventoryId: json['inventory_id']?.toString() ?? '',
-      quantity: (json['quantity'] ?? 0) as int,
+      id: json['id'],
+      inventoryId: json['inventory_id'],
+      quantity: json['quantity'],
       completed: json['completed'] ?? false,
       queuePosition: json['queue_position'] ?? 0,
-      inventory: json['inventory'] != null 
-          ? Inventory.fromJson(json['inventory'])
-          : null,
-      createdAt: json['created_at'] != null 
-          ? DateTime.parse(json['created_at'].toString()) 
-          : DateTime.now(),
-      updatedAt: json['updated_at'] != null 
-          ? DateTime.parse(json['updated_at'].toString()) 
-          : DateTime.now(),
+      inventory: json['inventory'] != null ? Inventory.fromJson(Map<String, dynamic>.from(json['inventory'])) : null,
+      createdAt: DateTime.parse(json['created_at']),
+      updatedAt: DateTime.parse(json['updated_at']),
     );
   }
 
@@ -138,7 +131,7 @@ class ProductionQueueItem {
 
   // Helper methods
   bool get canComplete => !completed;
-  
+
   // Helper method to get inventory name
   String get productName => inventory?.productName ?? 'Unknown Product';
 }

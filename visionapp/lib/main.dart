@@ -21,7 +21,7 @@ class MyApp extends StatelessWidget {
       providers: AppProviders.providers,
       child: MaterialApp(
         navigatorKey: NavigationService.navigatorKey,
-        title: 'Production Management System',
+        title: 'Sypply Chain Management System',
         theme: ThemeData(
           primarySwatch: Colors.blue,
           visualDensity: VisualDensity.adaptivePlatformDensity,

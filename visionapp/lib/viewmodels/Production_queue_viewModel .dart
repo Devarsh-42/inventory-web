@@ -9,7 +9,7 @@ import '../widgets/inventory_status_widget.dart'; // Import for InventoryStatusD
 class ProductionQueueViewModel extends ChangeNotifier {
   final ProductionQueueRepository _queueRepository;
   final InventoryRepository _inventoryRepository;
-  
+
   List<ProductionQueueItem> _queueItems = [];
   List<InventoryStatusData> _inventoryItems = [];
   bool _isLoading = false;
@@ -18,16 +18,16 @@ class ProductionQueueViewModel extends ChangeNotifier {
   ProductionQueueViewModel({
     required ProductionQueueRepository queueRepository,
     required InventoryRepository inventoryRepository,
-  }) : 
-    _queueRepository = queueRepository,
-    _inventoryRepository = inventoryRepository;
+  }) : _queueRepository = queueRepository,
+       _inventoryRepository = inventoryRepository;
 
   // Getters
   bool get isLoading => _isLoading;
   String? get error => _error;
   List<ProductionQueueItem> get queueItems => List.unmodifiable(_queueItems);
-  List<InventoryStatusData> get inventoryItems => List.unmodifiable(_inventoryItems);
-  
+  List<InventoryStatusData> get inventoryItems =>
+      List.unmodifiable(_inventoryItems);
+
   // Queue status getters
   bool get hasItems => _queueItems.isNotEmpty;
   bool get hasCompletedItems => _queueItems.any((item) => item.completed);
@@ -35,13 +35,10 @@ class ProductionQueueViewModel extends ChangeNotifier {
   // Load inventory statuses
   Future<void> loadInventoryStatuses() async {
     try {
-      final inventoryList = await _inventoryRepository.getAllInventory();
-      _inventoryItems = inventoryList.map((inventory) => InventoryStatusData(
-        productName: inventory.productName,
-        inventoryId: inventory.id,
-        totalRequiredQty: inventory.totalRequiredQty, // Add default value or use inventory.requiredQty
-        availableQty: inventory.availableQty,  // Use actual quantity from inventory
-      )).toList();
+      final raw =
+          await _inventoryRepository.getAllInventory(); // or call inventory_status view
+          _inventoryItems = raw.map((i) => InventoryStatusData.fromJson(i.toJson())).toList();
+
       notifyListeners();
     } catch (e) {
       debugPrint('Failed to load inventory statuses: $e');
@@ -83,9 +80,17 @@ class ProductionQueueViewModel extends ChangeNotifier {
   }
 
   // Allocate from inventory
-  Future<void> allocateFromInventory(String inventoryId, String queueId, int quantity) async {
+  Future<void> allocateFromInventory(
+    String inventoryId,
+    String queueId,
+    int quantity,
+  ) async {
     try {
-      await _queueRepository.allocateFromInventory(inventoryId, queueId, quantity);
+      await _queueRepository.allocateFromInventory(
+        inventoryId,
+        queueId,
+        quantity,
+      );
       await loadQueue(); // Refresh both queue and inventory
     } catch (e) {
       _setError('Failed to allocate inventory: $e');
@@ -96,15 +101,15 @@ class ProductionQueueViewModel extends ChangeNotifier {
   Future<void> reorderQueue(int oldIndex, int newIndex) async {
     try {
       _setLoading(true);
-      
+
       if (newIndex > oldIndex) {
         newIndex -= 1;
       }
-      
+
       final List<String> newOrder = _queueItems.map((item) => item.id).toList();
       final String item = newOrder.removeAt(oldIndex);
       newOrder.insert(newIndex, item);
-      
+
       await _queueRepository.updateQueueOrder(newOrder);
       await loadQueue(); // Refresh the queue after reordering
     } catch (e) {

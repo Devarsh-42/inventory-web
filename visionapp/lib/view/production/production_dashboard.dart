@@ -36,6 +36,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
       final viewModel = Provider.of<ProductionViewModel>(context, listen: false);
       viewModel.loadProductions();
       viewModel.loadProductNames();
+      context.read<InventoryViewModel>().loadInventory();
     });
   }
 
@@ -43,16 +44,16 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1E40AF),
+      backgroundColor: const Color(0xFF9349fc), // Changed this line
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xFF1E3A8A),
-              Color(0xFF3B82F6),
-              Color(0xFF1E40AF),
+              Color(0xFF7637ca), // Darker shade of #9349fc
+              Color(0xFF9349fc), // Main color
+              Color(0xFFa76bfd), // Lighter shade of #9349fc
             ],
           ),
         ),
@@ -285,144 +286,96 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
   }
 
   Widget _buildInventoryStatus() {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 140),
-      width: double.infinity, // Add this
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-      ),
+    return SizedBox(
+      height: 140, // Fixed height
       child: Consumer<InventoryViewModel>(
-  builder: (context, inventoryViewModel, _) {
-    if (inventoryViewModel.isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    
-    if (inventoryViewModel.error != null) {
-      return Center(child: Text(inventoryViewModel.error!));
-    }
+        builder: (context, inventoryViewModel, _) {
+          if (inventoryViewModel.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          
+          if (inventoryViewModel.error != null) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(inventoryViewModel.error!),
+              ),
+            );
+          }
 
-    if (inventoryViewModel.inventory.isEmpty) {
-      return const Center(child: Text('No inventory items available'));
-    }
+          if (inventoryViewModel.inventory.isEmpty) {
+            return const Center(child: Text('No inventory items available'));
+          }
 
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: inventoryViewModel.inventory.length,
-      itemBuilder: (context, index) {
-        final inventory = inventoryViewModel.inventory[index];
-        return InventoryStatusWidget(
-          inventory: inventory
-        );
-      },
-    );
-  },
-),
+          return ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: inventoryViewModel.inventory.length,
+            itemBuilder: (context, index) {
+              final inventory = inventoryViewModel.inventory[index];
+              return Padding(
+                padding: const EdgeInsets.only(right: 16),
+                child: InventoryStatusWidget(inventory: inventory),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 
+  // Update the _buildStatsGrid method
   Widget _buildStatsGrid(ProductionViewModel viewModel) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        bool isMobile = ResponsiveHelper.isMobile(context);
+        final isMobile = ResponsiveHelper.isMobile(context);
         
         return Container(
-          width: double.infinity, // Ensure full width
-          constraints: const BoxConstraints(minHeight: 180),
+          width: double.infinity,
+          constraints: const BoxConstraints(minHeight: 140),
           child: isMobile 
             ? Column(
-                mainAxisSize: MainAxisSize.min, // Add this
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    height: 140,
-                    width: double.infinity, // Add this
-                    child: _buildInventoryStatus(),
-                  ),
+                  _buildInventoryStatus(),
                   const SizedBox(height: 16),
-                  Container(
+                  SizedBox(
                     height: 120,
-                    width: double.infinity, // Add this
                     child: _buildStatCards(viewModel),
                   ),
                 ],
               )
-            : IntrinsicHeight( // Wrap with IntrinsicHeight
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      flex: 3,
-                      child: Container(
-                        width: double.infinity, // Add this
-                        child: _buildInventoryStatus(),
-                      ),
+            : Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: _buildInventoryStatus(),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    flex: 2,
+                    child: SizedBox(
+                      height: 140,
+                      child: _buildStatCards(viewModel),
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      flex: 2,
-                      child: Container(
-                        width: double.infinity, // Add this
-                        child: _buildStatCards(viewModel),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
         );
       }
     );
   }
 
-  Widget _buildStatCards(ProductionViewModel viewModel) {
-    bool isMobile = ResponsiveHelper.isMobile(context);
-    
-    return Container(
-      width: double.infinity, // Add this
-      constraints: const BoxConstraints(minHeight: 120),
-      child: isMobile
-        ? Row(
-            children: [
-              Expanded(
-                child: AspectRatio( // Wrap with AspectRatio
-                  aspectRatio: 1.5,
-                  child: _buildStatCard(
-                    title: 'IN PRODUCTION',
-                    value: viewModel.getProductionsByStatus('in-progress').length,
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFF1E40AF), Color(0xFF3B82F6)],
-                    ),
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ProductsScreen(),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: AspectRatio( // Wrap with AspectRatio
-                  aspectRatio: 1.5,
-                  child: _buildStatCard(
-                    title: 'READY TO SHIP',
-                    value: viewModel.getProductionsByStatus('completed').length,
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFF059669), Color(0xFF10B981)],
-                    ),
-                    onTap: _handleReadyToShipNavigation,
-                  ),
-                ),
-              ),
-            ],
-          )
-        : Column(
+Widget _buildStatCards(ProductionViewModel viewModel) {
+  bool isMobile = ResponsiveHelper.isMobile(context);
+  
+  return Container(
+    width: double.infinity,
+    // Remove fixed minHeight constraint that causes overflow
+    child: isMobile
+      ? IntrinsicHeight( // Ensures both cards have same height
+          child: Row(
             children: [
               Expanded(
                 child: _buildStatCard(
@@ -441,7 +394,7 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(width: 12),
               Expanded(
                 child: _buildStatCard(
                   title: 'READY TO SHIP',
@@ -456,58 +409,108 @@ class _ProductionDashboardScreenState extends State<ProductionDashboardScreen> {
               ),
             ],
           ),
-    );
-  }
-
-  Widget _buildStatCard({
-    required String title,
-    required int value,
-    required LinearGradient gradient,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: gradient,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: gradient.colors.first.withOpacity(0.2),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
+        )
+      : Column(
+          mainAxisSize: MainAxisSize.min, // Important: don't take more space than needed
+          children: [
+            Flexible( // Changed from Expanded to Flexible
+              child: _buildStatCard(
+                title: 'IN PRODUCTION',
+                value: viewModel.getProductionsByStatus('in-progress').length,
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF1E40AF), Color(0xFF3B82F6)],
+                ),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ProductsScreen(),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8), // Reduced spacing
+            Flexible( // Changed from Expanded to Flexible
+              child: _buildStatCard(
+                title: 'READY TO SHIP',
+                value: viewModel.getProductionsByStatus('completed').length,
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF059669), Color(0xFF10B981)],
+                ),
+                onTap: _handleReadyToShipNavigation,
+              ),
             ),
           ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
+  );
+}
+
+Widget _buildStatCard({
+  required String title,
+  required int value,
+  required LinearGradient gradient,
+  required VoidCallback onTap,
+}) {
+  return GestureDetector(
+    onTap: onTap,
+    child: Container(
+      constraints: const BoxConstraints(
+        minHeight: 80, // Minimum height for usability
+        maxHeight: 120, // Maximum height to prevent overflow
+      ),
+      padding: const EdgeInsets.all(12), // Reduced padding
+      decoration: BoxDecoration(
+        gradient: gradient,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: gradient.colors.first.withOpacity(0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisSize: MainAxisSize.min, // Don't expand unnecessarily
+        children: [
+          Flexible( // Allow text to shrink if needed
+            child: Text(
               NumberFormatter.formatQuantity(value),
               style: const TextStyle(
-                fontSize: 20,
+                fontSize: 18, // Slightly smaller
                 fontWeight: FontWeight.w800,
                 color: Colors.white,
                 letterSpacing: -0.5,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            Text(
+          ),
+          const SizedBox(height: 4), // Small spacing
+          Flexible( // Allow text to shrink if needed
+            child: Text(
               title,
               style: const TextStyle(
-                fontSize: 12,
+                fontSize: 11, // Slightly smaller
                 fontWeight: FontWeight.w600,
                 color: Colors.white,
                 letterSpacing: 0.5,
               ),
+              maxLines: 2, // Allow wrapping if needed
+              overflow: TextOverflow.ellipsis,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
-    );
-  }
-
+    ),
+  );
+}
+  
   Widget _buildActiveProductions(ProductionViewModel viewModel) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

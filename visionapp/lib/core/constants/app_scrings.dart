@@ -1,5 +1,5 @@
 class AppStrings {
-  static const String appTitle = 'Production Management System';
+  static const String appTitle = 'Supply Chain Management System';
   static const String dashboard = 'Dashboard';
   static const String dashboardTitle_admin = 'Admin Dashboard';
   static const String orders = 'Orders';

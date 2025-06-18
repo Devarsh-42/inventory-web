@@ -97,9 +97,4 @@ class ProductsRepository {
       return false;
     }
   }
-
-  // Clear cache (useful for testing or forced refresh)
-  void clearCache() {
-    _productsCache.clear();
-  }
 }

@@ -54,28 +54,33 @@ class DispatchViewModel extends ChangeNotifier {
   }
 
   // Load inventory data directly using Supabase
-  Future<void> loadInventory() async {
-    try {
-      _setLoading(true);
-      
-      final response = await _supabaseService.client
-          .from('inventory_view') // Using a view that aggregates inventory data
-          .select()
-          .order('product_name');
+Future<void> loadInventory() async {
+  _setError(null);
+  _setLoading(true);
+  try {
+    final response = await _supabaseService.client
+         .from('inventory')
+         .select()
+         .order('product_name');
 
-      _inventoryStatus = {};
-      
-      for (var item in response as List) {
-        _inventoryStatus[item['product_name']] = InventoryStatusData.fromJson(item);
-      }
+    _inventoryStatus.clear();
+    for (final item in response as List<dynamic>) {
+      final map = item as Map<String, dynamic>;
+      final id = map['id'] as String?;
+      final name = map['product_name'] as String?;
+      if (id == null || name == null) continue;
 
-      notifyListeners();
-    } catch (e) {
-      _setError('Failed to load inventory: $e');
-    } finally {
-      _setLoading(false);
+      _inventoryStatus[name] = InventoryStatusData.fromJson(map);
     }
+    notifyListeners();
+
+  } catch (e) {
+    _setError('Failed to load inventory: $e');
+  } finally {
+    _setLoading(false);
   }
+}
+
 
   // Mark item as ready
   Future<void> markItemReady(String itemId) async {
@@ -115,7 +120,7 @@ class DispatchViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _setError(String error) {
+  void _setError(String? error) {
     _error = error;
     notifyListeners();
   }
@@ -135,12 +140,13 @@ class InventoryStatusData {
     required this.availableQty,
   });
 
-  factory InventoryStatusData.fromJson(Map<String, dynamic> json) {
-    return InventoryStatusData(
-      inventoryId: json['id'] ?? '',
-      productName: json['product_name'] ?? '',
-      totalRequiredQty: json['total_required_qty'] ?? 0,
-      availableQty: json['available_qty'] ?? 0,
-    );
-  }
+factory InventoryStatusData.fromJson(Map<String, dynamic> json) {
+  return InventoryStatusData(
+    inventoryId: json['id'],
+    productName: json['product_name'],
+    totalRequiredQty: json['total_required_qty'] ?? 0,
+    availableQty: json['available_qty'] ?? 0,
+  );
+}
+
 }
